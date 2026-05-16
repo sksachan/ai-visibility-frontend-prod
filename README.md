@@ -63,3 +63,19 @@ Use "Upload report JSON" in the header to load a completed Bodhi/Railway report 
 ## PDF export
 
 The `Download PDF` button exports the current report DOM using `html2canvas` and `jspdf`. For production-grade, multi-page board packs, replace this later with a server-side Playwright export endpoint.
+
+
+## Bodhi Preview Node contract
+
+The upload parser now treats the Preview Node tile `frontend_report_bundle` as the canonical source of truth. When a full Bodhi workflow export is uploaded, the frontend first looks for:
+
+```text
+Preview Node -> layout.tiles[] -> i === "frontend_report_bundle" -> data.default
+```
+
+That JSON should contain `schema_version: "frontend_report_bundle_v1_preview_contract"` plus dashboard arrays for query evidence, owned readiness, CMS modules, PR opportunities and the full action checklist. The parser only falls back to scattered node outputs when this tile is missing.
+
+
+## v5 parser fixes
+
+This build is aligned to the Bodhi Preview Node `frontend_report_bundle` contract. It parses stringified executive and PR JSON, enriches query cards with the embedded source-preference benchmark rows, derives observed domain cards from `source_landscape.sources`, reads winning source patterns from `visibility.external_benchmark_patterns`, and uses the explicit embedded `action_checklist` items.

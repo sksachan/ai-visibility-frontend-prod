@@ -13,6 +13,7 @@ import type { ReportBundle } from './types/report';
 import { mockReport } from './data/mockReport';
 
 type Tab = 'executive' | 'matrix' | 'queries' | 'owned' | 'recommendations' | 'actions' | 'refresh';
+type Notice = { tone: 'success' | 'warning' | 'error'; message: string } | null;
 
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'executive', label: 'Executive report' },
@@ -28,21 +29,27 @@ export default function App() {
   const [report, setReport] = useState<ReportBundle>(mockReport);
   const [activeTab, setActiveTab] = useState<Tab>('executive');
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<Notice>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const brand = import.meta.env.VITE_DEFAULT_BRAND || report.brand;
   const market = import.meta.env.VITE_DEFAULT_MARKET || report.market;
 
   useEffect(() => {
-    void loadLatest();
+    void loadLatest(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadLatest() {
+  async function loadLatest(isInitialLoad = false) {
     setLoading(true);
+    setNotice(null);
     try {
       const latest = await fetchLatestReport(brand, market);
       setReport(latest);
+      if (!isInitialLoad) setNotice({ tone: 'success', message: `Loaded latest report for ${latest.brand} / ${latest.market}.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setNotice({ tone: 'error', message: `Could not load latest report. ${message}` });
     } finally {
       setLoading(false);
     }
@@ -50,9 +57,21 @@ export default function App() {
 
   async function onUpload(file: File | undefined) {
     if (!file) return;
-    const text = await file.text();
-    const json = JSON.parse(text);
-    setReport(normaliseReport(json));
+    setNotice(null);
+    try {
+      const text = await file.text();
+      if (!text.trim()) throw new Error('The selected file is empty.');
+      const json = JSON.parse(text);
+      const nextReport = normaliseReport(json);
+      setReport(nextReport);
+      setActiveTab('executive');
+      setNotice({ tone: 'success', message: `Uploaded ${file.name}. Parsed ${nextReport.queries.length} queries, ${nextReport.ownedPages.length} owned pages, ${nextReport.cmsModules.length} CMS modules, ${nextReport.prOpportunities.length} PR opportunities and ${nextReport.actionChecklist.length} actions from the file.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown parsing error';
+      setNotice({ tone: 'error', message: `Upload failed: ${message}` });
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
   }
 
   const fileName = useMemo(() => `${report.brand}_${report.market}_${report.runId}_ai_visibility_report.pdf`.replaceAll(' ', '_'), [report]);
@@ -66,7 +85,7 @@ export default function App() {
             <h1 className="text-xl font-semibold text-slate-950">GEO Intelligence Dashboard</h1>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={loadLatest} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+            <button onClick={() => void loadLatest(false)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
               <RefreshCcw size={16} /> {loading ? 'Loading...' : 'Load latest'}
             </button>
             <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
@@ -86,6 +105,14 @@ export default function App() {
           ))}
         </nav>
       </header>
+
+      {notice && (
+        <div className="mx-auto max-w-7xl px-4 pt-4 no-print">
+          <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${notice.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : notice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
+            {notice.message}
+          </div>
+        </div>
+      )}
 
       <main id="report-root" className="mx-auto max-w-7xl space-y-6 px-4 py-6">
         {activeTab === 'executive' && <ExecutiveReport report={report} />}

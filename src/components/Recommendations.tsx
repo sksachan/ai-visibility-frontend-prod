@@ -6,28 +6,56 @@ const tone = (priority: string) => priority === 'High' ? 'high' : priority === '
 export function Recommendations({ report }: { report: ReportBundle }) {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
-      <RecommendationPanel title="CMS recommendations" eyebrow="Content remediation" items={report.cmsModules} />
-      <RecommendationPanel title="PR opportunities" eyebrow="External evidence" items={report.prOpportunities} />
+      <RecommendationPanel title={`CMS recommendations (${report.cmsModules.length})`} eyebrow="Content remediation" items={report.cmsModules} type="cms" />
+      <RecommendationPanel title={`PR opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" />
     </div>
   );
 }
 
-function RecommendationPanel({ title, eyebrow, items }: { title: string; eyebrow: string; items: RecommendationModule[] }) {
+function RecommendationPanel({ title, eyebrow, items, type }: { title: string; eyebrow: string; items: RecommendationModule[]; type: 'cms' | 'pr' }) {
   return (
     <Card>
       <SectionTitle eyebrow={eyebrow} title={title} />
       <div className="space-y-4">
-        {items.map((item) => (
+        {items.length ? items.map((item) => (
           <div key={`${item.title}-${item.targetUrl}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-base font-semibold text-slate-950">{item.title}</h3>
+              <div>
+                <h3 className="text-base font-semibold text-slate-950">{item.title}</h3>
+                {item.journeyCategory && <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{item.journeyCategory}</p>}
+              </div>
               <Badge tone={tone(item.priority)}>{item.priority}</Badge>
             </div>
-            <p className="mt-2 text-sm text-slate-500">Owner: {item.owner} · Target: {item.targetUrl}</p>
+            <p className="mt-2 break-all text-sm text-slate-500">Owner: {item.owner} · Target: {item.targetUrl}</p>
             <p className="mt-3 text-sm leading-6 text-slate-700">{item.recommendation}</p>
-            <p className="mt-3 rounded-xl bg-white p-3 text-sm leading-6 text-slate-600"><span className="font-semibold text-slate-900">Winning pattern:</span> {item.evidencePattern}</p>
+            {item.introCopy && <p className="mt-3 rounded-xl bg-white p-3 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">Intro copy:</span> {item.introCopy}</p>}
+            {item.bodyCopy && (
+              <details className="mt-3 rounded-xl bg-white p-3 text-sm leading-6 text-slate-700">
+                <summary className="cursor-pointer font-semibold text-slate-900">View CMS body copy</summary>
+                <p className="mt-2">{item.bodyCopy}</p>
+              </details>
+            )}
+            {item.bulletPoints?.length ? (
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700">
+                {item.bulletPoints.map((point) => <li key={point}>{point}</li>)}
+              </ul>
+            ) : null}
+            {item.faqItems?.length ? (
+              <details className="mt-3 rounded-xl bg-white p-3 text-sm leading-6 text-slate-700">
+                <summary className="cursor-pointer font-semibold text-slate-900">View FAQ item</summary>
+                {item.faqItems.map((faq) => (
+                  <div key={faq.question} className="mt-2">
+                    <p className="font-semibold text-slate-900">{faq.question}</p>
+                    <p>{faq.answer}</p>
+                  </div>
+                ))}
+              </details>
+            ) : null}
+            {type === 'pr' && item.whyItMatters && <p className="mt-3 rounded-xl bg-white p-3 text-sm leading-6 text-slate-700"><span className="font-semibold text-slate-900">Why it matters:</span> {item.whyItMatters}</p>}
+            <p className="mt-3 rounded-xl bg-white p-3 text-sm leading-6 text-slate-600"><span className="font-semibold text-slate-900">Evidence basis:</span> {item.evidencePattern}</p>
+            {item.validationRequired?.length ? <p className="mt-2 text-xs text-slate-500">Validation required: {item.validationRequired.join(', ')}</p> : null}
           </div>
-        ))}
+        )) : <p className="text-sm text-slate-500">No {title.toLowerCase()} were found in the uploaded output.</p>}
       </div>
     </Card>
   );
@@ -36,7 +64,9 @@ function RecommendationPanel({ title, eyebrow, items }: { title: string; eyebrow
 export function ActionChecklist({ report }: { report: ReportBundle }) {
   return (
     <Card>
-      <SectionTitle eyebrow="Action checklist" title="Translate visibility gaps into owned actions, owners and delivery effort" />
+      <SectionTitle eyebrow="Action checklist" title={`Explicit Bodhi action checklist (${report.actionChecklist.length})`}>
+        This view reads the checklist items embedded in the Preview Node bundle. Each action is kept as a delivery backlog item rather than being regenerated by the frontend.
+      </SectionTitle>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead>
@@ -45,17 +75,21 @@ export function ActionChecklist({ report }: { report: ReportBundle }) {
               <th className="px-3 py-3">Owner</th>
               <th className="px-3 py-3">Priority</th>
               <th className="px-3 py-3">Effort</th>
+              <th className="px-3 py-3">Dependency</th>
               <th className="px-3 py-3">Status</th>
+              <th className="px-3 py-3">Source</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {report.actionChecklist.map((item) => (
-              <tr key={item.action}>
-                <td className="px-3 py-4 font-medium text-slate-950">{item.action}</td>
+              <tr key={`${item.source}-${item.action}`} className="align-top">
+                <td className="max-w-xl px-3 py-4 font-medium leading-6 text-slate-950">{item.action}</td>
                 <td className="px-3 py-4 text-slate-600">{item.owner}</td>
                 <td className="px-3 py-4"><Badge tone={tone(item.priority)}>{item.priority}</Badge></td>
                 <td className="px-3 py-4 text-slate-600">{item.effort}</td>
+                <td className="max-w-xs px-3 py-4 text-slate-600">{item.dependency}</td>
                 <td className="px-3 py-4 text-slate-600">{item.status}</td>
+                <td className="px-3 py-4 text-slate-500">{item.source}</td>
               </tr>
             ))}
           </tbody>

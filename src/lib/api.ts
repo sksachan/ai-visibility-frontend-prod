@@ -12,18 +12,15 @@ async function fetchJson<T>(path: string): Promise<T> {
 }
 
 export async function fetchLatestReport(brand: string, market: string): Promise<ReportBundle> {
-  try {
-    const latest = await fetchJson<{ run_id?: string; runId?: string }>(
-      `/runs/latest?brand=${encodeURIComponent(brand)}&market=${encodeURIComponent(market)}`
-    );
-    const runId = latest.run_id ?? latest.runId;
-    if (!runId) throw new Error('Latest run response did not include run_id');
-    const dashboard = await fetchJson<unknown>(`/runs/${encodeURIComponent(runId)}/dashboard`);
-    return normaliseReport(dashboard);
-  } catch (error) {
-    console.warn('Falling back to mock report:', error);
-    return mockReport;
-  }
+  if (!API_BASE_URL) return mockReport;
+
+  const latest = await fetchJson<{ run_id?: string; runId?: string }>(
+    `/runs/latest?brand=${encodeURIComponent(brand)}&market=${encodeURIComponent(market)}`
+  );
+  const runId = latest.run_id ?? latest.runId;
+  if (!runId) throw new Error('Latest run response did not include run_id');
+  const dashboard = await fetchJson<unknown>(`/runs/${encodeURIComponent(runId)}/dashboard`);
+  return normaliseReport(dashboard);
 }
 
 export async function triggerFullRefresh(payload: {
