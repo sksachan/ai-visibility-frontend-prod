@@ -37,17 +37,24 @@ export type RefreshEvidencePayload = {
   queryPortfolioMode: string;
   queryPortfolioId?: string;
   sitemapUrl?: string;
+  seedTopics?: string;
+  topicCount?: number;
+  queriesPerTopic?: number;
+  language?: string;
+  portfolioGoal?: string;
   queryLimit: number;
   maxOwnedPagesPerQuery: number;
   maxExternalCitationsPerQuery: number;
   enableSerpapi: boolean;
   enableOwnedCrawl: boolean;
   enableExternalCrawl: boolean;
+  triggerAuditor: boolean;
 };
 
 export type RefreshEvidenceResult = {
   runId?: string;
   jobId?: string;
+  targetRunId?: string;
   status?: string;
   message?: string;
   evidenceRunId?: string;
@@ -57,8 +64,10 @@ export type RefreshEvidenceResult = {
 export type RunStatusSummary = {
   active?: boolean;
   status?: string;
+  stage?: string;
   runId?: string;
   jobId?: string;
+  targetRunId?: string;
   startedAt?: string;
   completedAt?: string;
   failedAt?: string;
@@ -80,10 +89,11 @@ export async function refreshEvidence(payload: RefreshEvidencePayload): Promise<
     throw new Error(detail);
   }
   return {
-    runId: String(data.run_id ?? data.runId ?? data.evidence_run_id ?? data.evidenceRunId ?? data.id ?? ''),
+    runId: String(data.run_id ?? data.runId ?? data.evidence_run_id ?? data.evidenceRunId ?? data.target_run_id ?? data.targetRunId ?? data.id ?? ''),
     jobId: String(data.job_id ?? data.jobId ?? data.id ?? ''),
-    evidenceRunId: String(data.evidence_run_id ?? data.evidenceRunId ?? data.run_id ?? data.runId ?? ''),
-    status: String(data.status ?? data.state ?? 'started'),
+    targetRunId: String(data.target_run_id ?? data.targetRunId ?? data.evidence_run_id ?? data.evidenceRunId ?? ''),
+    evidenceRunId: String(data.evidence_run_id ?? data.evidenceRunId ?? data.target_run_id ?? data.targetRunId ?? data.run_id ?? data.runId ?? ''),
+    status: String(data.status ?? data.stage ?? data.state ?? 'started'),
     message: data.message ? String(data.message) : undefined,
     raw: data
   };
@@ -102,18 +112,24 @@ export async function fetchRefreshStatus(brand: string, market: string): Promise
   }
 
   const runs = Array.isArray(data?.runs) ? data.runs : Array.isArray(data) ? data : [];
-  const activeRun = runs.find((run: Record<string, unknown>) => ['queued', 'pending', 'running', 'in_progress', 'in-progress', 'started'].includes(String(run.status ?? run.state ?? '').toLowerCase()));
-  const latestSuccess = runs.find((run: Record<string, unknown>) => ['success', 'successful', 'completed', 'succeeded'].includes(String(run.status ?? run.state ?? '').toLowerCase()));
+  const terminal = new Set(['success', 'successful', 'completed', 'succeeded', 'failed', 'error', 'cancelled', 'canceled']);
+  const isActive = (run: Record<string, unknown>) => {
+    const value = String(run.status ?? run.state ?? run.stage ?? '').toLowerCase();
+    return value ? !terminal.has(value) : false;
+  };
+  const activeRun = runs.find((run: Record<string, unknown>) => isActive(run)) || (!terminal.has(String(data?.status ?? data?.stage ?? data?.state ?? '').toLowerCase()) ? data : null);
+  const latestSuccess = runs.find((run: Record<string, unknown>) => ['success', 'successful', 'completed', 'succeeded', 'report_bundle_ready', 'evidence_ready'].includes(String(run.status ?? run.state ?? run.stage ?? '').toLowerCase()));
 
   return {
     active: Boolean(activeRun || data?.active),
-    status: String(activeRun?.status ?? activeRun?.state ?? data?.status ?? data?.state ?? ''),
-    runId: String(activeRun?.run_id ?? activeRun?.runId ?? data?.run_id ?? data?.runId ?? ''),
+    status: String(activeRun?.status ?? activeRun?.state ?? activeRun?.stage ?? data?.status ?? data?.state ?? data?.stage ?? ''),
+    stage: String(activeRun?.stage ?? data?.stage ?? ''),
+    runId: String(activeRun?.run_id ?? activeRun?.runId ?? data?.run_id ?? data?.runId ?? data?.target_run_id ?? data?.targetRunId ?? ''),
     jobId: String(activeRun?.job_id ?? activeRun?.jobId ?? data?.job_id ?? data?.jobId ?? ''),
     startedAt: String(activeRun?.started_at ?? activeRun?.startedAt ?? data?.started_at ?? data?.startedAt ?? ''),
     completedAt: String(data?.completed_at ?? data?.completedAt ?? ''),
     failedAt: String(data?.failed_at ?? data?.failedAt ?? ''),
-    latestSuccessfulRunId: String(latestSuccess?.run_id ?? latestSuccess?.runId ?? data?.latest_successful_run_id ?? data?.latestSuccessfulRunId ?? ''),
+    latestSuccessfulRunId: String(latestSuccess?.run_id ?? latestSuccess?.runId ?? data?.latest_successful_run_id ?? data?.latestSuccessfulRunId ?? data?.latest_successful_report_run_id ?? ''),
     latestSuccessfulAt: String(latestSuccess?.completed_at ?? latestSuccess?.completedAt ?? data?.latest_successful_at ?? data?.latestSuccessfulAt ?? ''),
     runs,
     raw: data
@@ -133,7 +149,8 @@ export async function triggerFullRefresh(payload: { brand: string; market: strin
     maxExternalCitationsPerQuery: 3,
     enableSerpapi: payload.externalEvidence === 'refresh_serp_evidence',
     enableOwnedCrawl: payload.ownedUrlDiscovery !== 'previous_inventory',
-    enableExternalCrawl: payload.externalEvidence === 'crawl_external_citations'
+    enableExternalCrawl: payload.externalEvidence === 'crawl_external_citations',
+    triggerAuditor: true
   });
   return { jobId: result.jobId || result.runId || `job-${Date.now()}` };
 }
