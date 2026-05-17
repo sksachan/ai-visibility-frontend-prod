@@ -588,26 +588,57 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
       });
     });
   });
-  const mapCms = (item: AnyRecord): RecommendationModule => ({
-    title: asString(item.title, 'CMS recommendation'),
-    targetUrl: asString(firstDefined(item.targetUrl, item.target_url)),
-    recommendation: asString(item.recommendation),
-    evidencePattern: asString(firstDefined(item.evidencePattern, item.winning_pattern_to_copy, item.evidence_basis)),
+  const linkedIds = (value: unknown): string[] => asArray<AnyRecord>(value).map((q) => asString(firstDefined(q.query_id, q.id))).filter(Boolean);
+  const mapCms = (item: AnyRecord): RecommendationModule => {
+    const patterns = asArray<AnyRecord>(item.winning_patterns_to_aggregate);
+    const evidencePattern = asString(firstDefined(
+      item.evidencePattern,
+      item.winning_pattern_to_copy,
+      item.evidence_basis,
+      patterns.map((p) => asString(firstDefined(p.pattern_type, p.evidence_basis))).filter(Boolean).join('; ')
+    ), 'No evidence pattern supplied');
+    return {
+      title: asString(item.title, 'CMS recommendation'),
+      targetUrl: asString(firstDefined(item.targetUrl, item.target_url)),
+      recommendation: asString(firstDefined(item.recommendation, item.recommended_change), 'No recommendation supplied'),
+      evidencePattern,
+      priority: priority(item.priority),
+      owner: asString(item.owner, 'AEM/CMS'),
+      journeyCategory: asString(item.journey_category),
+      moduleType: asString(firstDefined(item.moduleType, item.module_type)),
+      placement: asString(firstDefined(item.placement, item.recommended_placement)),
+      bulletPoints: asArray<string>(item.content_requirements),
+      validationRequired: asArray<string>(item.validation_required),
+      whyItMatters: asString(firstDefined(item.why_it_matters, asRecord(item.expected_impact).ai_visibility_target)),
+      evidenceBasis: evidencePattern,
+      targetSourceTypes: asArray<AnyRecord>(item.source_types_benchmarked).map((x) => asString(firstDefined(x.source_type, x.sourceType))).filter(Boolean),
+      valueScore: asNumber(item.value_score),
+      queryCoverageCount: asNumber(item.query_coverage_count),
+      linkedQueryIds: linkedIds(item.linked_queries)
+    };
+  };
+  const mapGroupedPr = (item: AnyRecord): RecommendationModule => ({
+    title: asString(firstDefined(item.title, item.recommended_pr_action), 'Grouped PR opportunity'),
+    targetUrl: asString(item.source_type, 'Grouped query/source opportunity'),
+    recommendation: asString(firstDefined(item.recommended_pr_action, item.recommendation), 'No PR action supplied'),
+    evidencePattern: asString(firstDefined(item.why_it_matters, item.evidence_basis), 'No PR evidence basis supplied'),
     priority: priority(item.priority),
-    owner: asString(item.owner, 'AEM/CMS'),
-    journeyCategory: asString(item.journey_category),
-    moduleType: asString(firstDefined(item.moduleType, item.module_type)),
-    placement: asString(item.placement),
-    bulletPoints: asArray<string>(item.content_requirements),
-    validationRequired: asArray<string>(item.validation_required),
+    owner: asString(item.owner, 'PR / Communications'),
+    journeyCategory: asArray<AnyRecord>(item.journey_mix).map((j) => asString(firstDefined(j.journey_category, j.journey))).filter(Boolean).slice(0, 3).join(', '),
+    moduleType: asString(firstDefined(item.opportunity_type, item.source_type)),
     whyItMatters: asString(item.why_it_matters),
-    evidenceBasis: asString(item.evidence_basis),
-    targetSourceTypes: asArray<string>(item.target_source_types)
+    evidenceBasis: asString(firstDefined(item.evidence_basis, item.why_it_matters)),
+    targetSourceTypes: [asString(item.source_type)].filter(Boolean),
+    valueScore: asNumber(item.value_score),
+    queryCoverageCount: asNumber(item.query_coverage_count),
+    linkedQueryIds: linkedIds(item.grouped_queries),
+    sourceType: asString(item.source_type),
+    observedExternalDomains: asArray<AnyRecord>(item.observed_external_domains).map((x) => ({ domain: asString(x.domain), count: asNumber(x.count) }))
   });
-  const cmsModules = asArray<AnyRecord>(source.cms_recommendations).map(mapCms);
-  const prOpportunities = asArray<AnyRecord>(source.pr_opportunities).map(mapCms);
+  const cmsModules = asArray<AnyRecord>(firstDefined(source.page_level_cms_recommendations, source.cms_recommendations)).map(mapCms);
+  const prOpportunities = asArray<AnyRecord>(firstDefined(source.grouped_pr_opportunities, source.pr_opportunities)).map(mapGroupedPr);
   const actionChecklist = asArray<AnyRecord>(source.action_checklist).map((item) => ({
-    action: asString(item.action), owner: asString(item.owner), priority: priority(item.priority), effort: effort(item.effort), status: status(item.status), dependency: asString(item.dependency), source: asString(item.source), target: asString(item.target), workstream: asString(item.workstream), category: asString(item.category), targetSourceTypes: asArray<string>(item.target_source_types)
+    action: asString(item.action), owner: asString(item.owner), priority: priority(item.priority), effort: effort(item.effort), status: status(item.status), dependency: asString(firstDefined(item.dependency, item.target_url, item.source_type)), source: asString(item.source), target: asString(firstDefined(item.target, item.target_url, item.source_type)), workstream: asString(item.workstream), category: asString(firstDefined(item.category, item.module_type)), targetSourceTypes: asArray<string>(item.target_source_types), valueScore: asNumber(item.value_score), queryCoverageCount: asNumber(item.query_coverage_count), linkedQueryIds: asArray<string>(item.linked_query_ids), moduleType: asString(item.module_type)
   }));
   const headline = asRecord(asRecord(source.executive).headline_metrics);
   const queryCount = asNumber(firstDefined(headline.query_count, kpis.query_count), queries.length);

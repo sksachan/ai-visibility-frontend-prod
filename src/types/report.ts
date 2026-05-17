@@ -126,6 +126,11 @@ export interface RecommendationModule {
   whyItMatters?: string;
   evidenceBasis?: string;
   targetSourceTypes?: string[];
+  valueScore?: number;
+  queryCoverageCount?: number;
+  linkedQueryIds?: string[];
+  sourceType?: string;
+  observedExternalDomains?: Array<{ domain: string; count?: number }>;
 }
 
 export interface ActionItem {
@@ -140,6 +145,11 @@ export interface ActionItem {
   workstream?: string;
   category?: string;
   targetSourceTypes?: string[];
+  valueScore?: number;
+  queryCoverageCount?: number;
+  linkedQueryIds?: string[];
+  sourceType?: string;
+  observedExternalDomains?: Array<{ domain: string; count?: number }>;
 }
 
 
