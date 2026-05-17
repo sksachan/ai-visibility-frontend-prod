@@ -8,7 +8,7 @@ import { QueryWorkbench } from './components/QueryWorkbench';
 import { ActionChecklist, CmsRecommendations, PrRecommendations } from './components/Recommendations';
 import { RefreshPanel } from './components/RefreshPanel';
 import { fetchLatestReport } from './lib/api';
-import { exportElementToPdf } from './lib/pdf';
+import { exportReportToPdf } from './lib/pdf';
 import { normaliseReport } from './lib/normaliseReport';
 import type { ReportBundle } from './types/report';
 import { mockReport } from './data/mockReport';
@@ -123,7 +123,7 @@ export default function App() {
               <Upload size={16} /> Upload report JSON
             </button>
             <input ref={fileRef} className="hidden" type="file" accept="application/json,.json" onChange={(e) => void onUpload(e.target.files?.[0])} />
-            <button onClick={() => void exportElementToPdf('pdf-report-root', fileName)} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
+            <button onClick={() => void exportReportToPdf(report, fileName)} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
               <Download size={16} /> Download PDF
             </button>
           </div>
