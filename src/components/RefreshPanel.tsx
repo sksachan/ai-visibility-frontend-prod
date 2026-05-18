@@ -118,6 +118,7 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
   const [runMode, setRunMode] = useState('fresh_mapping');
   const [queryPortfolioMode, setQueryPortfolioMode] = useState('synthetic');
   const [queryPortfolioId, setQueryPortfolioId] = useState('');
+  const [sourceRunId, setSourceRunId] = useState('');
   const [seedTopics, setSeedTopics] = useState('');
   const [topicCount, setTopicCount] = useState(8);
   const [queriesPerTopic, setQueriesPerTopic] = useState(6);
@@ -183,6 +184,7 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
         runMode,
         queryPortfolioMode,
         queryPortfolioId: queryPortfolioId.trim() || undefined,
+        sourceRunId: sourceRunId.trim() || undefined,
         sitemapUrl: sitemapUrl.trim() || undefined,
         seedTopics: seedTopics.trim() || undefined,
         topicCount,
@@ -257,7 +259,11 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
             </select>
           </label>
           <label className="text-sm font-medium text-slate-700">Existing portfolio ID
-            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={queryPortfolioId} onChange={(e) => setQueryPortfolioId(e.target.value)} placeholder="Optional" />
+            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={queryPortfolioId} onChange={(e) => setQueryPortfolioId(e.target.value)} placeholder="Optional; identifies the query portfolio only" />
+          </label>
+          <label className="text-sm font-medium text-slate-700 md:col-span-2">Reuse citation evidence run ID
+            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={sourceRunId} onChange={(e) => setSourceRunId(e.target.value)} placeholder="Optional; e.g. evidence_nissan_japan_1779101052_5d1acd" />
+            <span className="mt-1 block text-xs font-normal text-slate-500">Use this when SerpAPI is off but you want to reuse AI citation rows from an earlier evidence run.</span>
           </label>
           <label className="text-sm font-medium text-slate-700">Topic count
             <input type="number" min={1} max={20} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={topicCount} onChange={(e) => setTopicCount(Number(e.target.value))} />

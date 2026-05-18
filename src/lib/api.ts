@@ -36,6 +36,7 @@ export type RefreshEvidencePayload = {
   runMode: string;
   queryPortfolioMode: string;
   queryPortfolioId?: string;
+  sourceRunId?: string;
   sitemapUrl?: string;
   seedTopics?: string;
   topicCount?: number;

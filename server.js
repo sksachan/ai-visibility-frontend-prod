@@ -293,6 +293,7 @@ function normaliseRefreshPayload(body = {}) {
     run_mode: String(body.runMode || body.run_mode || 'reuse_existing_evidence'),
     query_portfolio_mode: String(body.queryPortfolioMode || body.query_portfolio_mode || 'reuse'),
     query_portfolio_id: String(body.queryPortfolioId || body.query_portfolio_id || ''),
+    source_run_id: String(body.sourceRunId || body.source_run_id || ''),
     sitemap_url: String(body.sitemapUrl || body.sitemap_url || ''),
     seed_topics: String(body.seedTopics || body.seed_topics || ''),
     topic_count: num(body.topicCount ?? body.topic_count, 8),
