@@ -18,6 +18,17 @@ export interface HeadlineMetrics {
   queriesWithCompetitorPresence?: number;
 }
 
+export interface BrandTopicScorecardRow {
+  topic: string;
+  aiVisibilityScore: number | null;
+  relativePosition: string;
+  directionVsLastPeriod: string;
+  comment: string;
+  queryCount?: number;
+  ownedUrlCount?: number;
+  citationCount?: number;
+}
+
 export interface ExecutiveSection {
   summary: string;
   whatIsHappening: string[];
@@ -27,6 +38,7 @@ export interface ExecutiveSection {
   recommendedNextSteps?: string[];
   methodologyCaveats?: string[];
   headlineMetrics: HeadlineMetrics;
+  brandTopicScorecard?: BrandTopicScorecardRow[];
 }
 
 export interface CompetitorVisibility {

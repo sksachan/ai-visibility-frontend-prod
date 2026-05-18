@@ -1,4 +1,4 @@
-import type { ActionItem, CitationExample, CmsCopyModule, OwnedPage, QueryDiagnostic, RecommendationModule, ReportBundle, Severity, SourceTypeCount, Status } from '../types/report';
+import type { ActionItem, BrandTopicScorecardRow, CitationExample, CmsCopyModule, OwnedPage, QueryDiagnostic, RecommendationModule, ReportBundle, Severity, SourceTypeCount, Status } from '../types/report';
 
 type AnyRecord = Record<string, any>;
 
@@ -169,6 +169,111 @@ function deriveObservedDomains(sources: AnyRecord[]): Array<{ domain: string; so
     }
   }
   return Array.from(map.values()).sort((a, b) => b.observedCount - a.observedCount);
+}
+
+
+function normaliseTopicName(value: unknown): string {
+  return asString(value, 'Unclassified').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim() || 'Unclassified';
+}
+
+function deriveBrandTopicScorecard(report: ReportBundle): BrandTopicScorecardRow[] {
+  const explicit = report.executive.brandTopicScorecard;
+  if (explicit?.length) return explicit.slice(0, 8);
+
+  const groups = new Map<string, {
+    topic: string;
+    scores: number[];
+    queryIds: Set<string>;
+    ownedUrls: Set<string>;
+    citations: number;
+    competitorMentions: Set<string>;
+    notCollected: number;
+    total: number;
+  }>();
+
+  const ensure = (topic: string) => {
+    const clean = normaliseTopicName(topic);
+    if (!groups.has(clean)) {
+      groups.set(clean, { topic: clean, scores: [], queryIds: new Set(), ownedUrls: new Set(), citations: 0, competitorMentions: new Set(), notCollected: 0, total: 0 });
+    }
+    return groups.get(clean)!;
+  };
+
+  if (report.queryWorkbench?.length) {
+    report.queryWorkbench.forEach((row) => {
+      const topic = normaliseTopicName(firstDefined(row.journey_category, row.query_type, asRecord(row).topic));
+      const group = ensure(topic);
+      const vis = asRecord(row.current_ai_visibility);
+      const queryId = asString(firstDefined(row.query_id, row.query));
+      if (queryId) group.queryIds.add(queryId);
+      group.total += 1;
+      const score = asNumber(vis.score, Number.NaN);
+      if (Number.isFinite(score) && (score > 0 || asString(vis.status).toLowerCase() !== 'not_collected')) group.scores.push(score);
+      if (asString(vis.status).toLowerCase().includes('not_collected')) group.notCollected += 1;
+      asArray<AnyRecord>(row.mapped_owned_urls).forEach((item) => { const url = asString(item.url); if (url) group.ownedUrls.add(url); });
+      const citations = asArray<AnyRecord>(firstDefined(vis.top_citations, row.external_top3_benchmark));
+      group.citations += citations.length;
+      asArray<string>(vis.competitors).forEach((name) => { if (name) group.competitorMentions.add(name); });
+    });
+  } else {
+    report.queries.forEach((query) => {
+      const group = ensure(query.journey || 'Unclassified');
+      group.queryIds.add(query.id || query.query);
+      group.total += 1;
+      if (Number.isFinite(query.aiVisibilityScore ?? Number.NaN) && (query.aiVisibilityScore ?? 0) > 0) group.scores.push(query.aiVisibilityScore ?? 0);
+      if (query.visibilityStatus?.toLowerCase().includes('not_collected')) group.notCollected += 1;
+      group.citations += query.citations.length;
+      query.competitorBrands?.forEach((name) => group.competitorMentions.add(name));
+    });
+    report.ownedPages.forEach((page) => {
+      const group = ensure(page.journeyCategory || 'Unclassified');
+      if (page.url) group.ownedUrls.add(page.url);
+    });
+  }
+
+  const rows = Array.from(groups.values())
+    .sort((a, b) => b.queryIds.size - a.queryIds.size || b.ownedUrls.size - a.ownedUrls.size)
+    .slice(0, 8)
+    .map((group) => {
+      const hasScore = group.scores.length > 0;
+      const averageScore = hasScore ? group.scores.reduce((sum, value) => sum + value, 0) / group.scores.length : null;
+      const topCompetitor = Array.from(group.competitorMentions)[0];
+      const relativePosition = group.citations === 0
+        ? 'Requires fresh AI citation evidence'
+        : topCompetitor
+          ? `Benchmark against ${topCompetitor}`
+          : 'No dominant competitor identified';
+      const direction = report.trend.length > 1 ? 'Available in trend view' : 'Not available';
+      const comment = group.citations === 0
+        ? `${group.topic} has ${group.queryIds.size} mapped query${group.queryIds.size === 1 ? '' : 'ies'} and ${group.ownedUrls.size} owned URL candidate${group.ownedUrls.size === 1 ? '' : 's'}, but SerpAPI citation evidence was not collected for this run.`
+        : hasScore && (averageScore ?? 0) >= 70
+          ? 'Strong topic visibility; maintain citation quality and monitor competitor movement.'
+          : hasScore && (averageScore ?? 0) >= 45
+            ? 'Present in AI evidence but not clearly owned; prioritise extractable owned-page modules and citation-safe proof.'
+            : 'Underrepresented in AI narratives; prioritise owned-page coverage and external authority building.';
+      return {
+        topic: group.topic,
+        aiVisibilityScore: averageScore,
+        relativePosition,
+        directionVsLastPeriod: direction,
+        comment,
+        queryCount: group.queryIds.size,
+        ownedUrlCount: group.ownedUrls.size,
+        citationCount: group.citations
+      };
+    });
+
+  return rows;
+}
+
+function withExecutiveScorecard(report: ReportBundle): ReportBundle {
+  return {
+    ...report,
+    executive: {
+      ...report.executive,
+      brandTopicScorecard: deriveBrandTopicScorecard(report)
+    }
+  };
 }
 
 function leadingDomain(citations: CitationExample[]): string {
@@ -768,21 +873,21 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
 export function normaliseReport(raw: unknown): ReportBundle {
   const root = asRecord(parseMaybeJson(raw));
   const frontendRoot = mapFrontendPreviewBundle(root);
-  if (frontendRoot) return frontendRoot;
+  if (frontendRoot) return withExecutiveScorecard(frontendRoot);
 
   const canonical = mapCanonicalReport(root);
-  if (canonical) return canonical;
+  if (canonical) return withExecutiveScorecard(canonical);
 
   const run = unwrapRun(root);
   const previewBundle = parsePreviewTile(run, 'frontend_report_bundle');
   const previewCanonical = mapCanonicalReport(previewBundle);
-  if (previewCanonical) return previewCanonical;
+  if (previewCanonical) return withExecutiveScorecard(previewCanonical);
   const frontendPreview = mapFrontendPreviewBundle(previewBundle);
-  if (frontendPreview) return frontendPreview;
+  if (frontendPreview) return withExecutiveScorecard(frontendPreview);
 
   const assembledBundle = parseNodeJson(run, 'Assemble frontend_report_bundle for Preview');
   const assembledCanonical = mapCanonicalReport(assembledBundle);
-  if (assembledCanonical) return assembledCanonical;
+  if (assembledCanonical) return withExecutiveScorecard(assembledCanonical);
 
   const ui = asRecord(nodeData(run, 'UI Node').response);
   const executiveReport = parseNodeJson(run, 'Executive Insight Synthesiser', 'response');
@@ -837,7 +942,7 @@ export function normaliseReport(raw: unknown): ReportBundle {
   const endedAt = asString(asRecord(nodeData(run, 'End')).endTime);
   const runId = Object.keys(root).length === 1 ? Object.keys(root)[0] : asString(firstDefined(ui.evidence_run_id, executivePayload.run_id), `${brand}_${market}_uploaded_run`);
 
-  return {
+  const fallbackReport: ReportBundle = {
     runId,
     brand,
     market,
@@ -901,4 +1006,6 @@ export function normaliseReport(raw: unknown): ReportBundle {
       ]
     }
   };
+
+  return withExecutiveScorecard(fallbackReport);
 }

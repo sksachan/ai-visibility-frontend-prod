@@ -1,5 +1,6 @@
 import type { ReportBundle } from '../types/report';
 import { Card, MetricCard, SectionTitle } from './ui';
+import { BrandTopicScorecard } from './BrandTopicScorecard';
 
 export function ExecutiveReport({ report }: { report: ReportBundle }) {
   const metrics = report.executive.headlineMetrics;
@@ -32,6 +33,8 @@ export function ExecutiveReport({ report }: { report: ReportBundle }) {
         <MetricCard label="Avg owned GEO" value={`${(metrics.averageOwnedGeoScore120 ?? 0).toFixed(1)} / 120`} />
         <MetricCard label="Owned pages audited" value={metrics.ownedPageCount ?? report.ownedPages.length} />
       </div>
+
+      <BrandTopicScorecard rows={report.executive.brandTopicScorecard ?? []} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Narrative title="What is happening" items={report.executive.whatIsHappening} />
