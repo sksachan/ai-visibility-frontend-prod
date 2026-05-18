@@ -116,6 +116,8 @@ export interface OwnedPage {
   diagnostics: string[];
   recommendedHtmlChanges?: string[];
   representativeCitations?: CitationExample[];
+  queryMapped?: boolean;
+  inventorySource?: string;
   technicalSignals?: { jsonLdPresent?: boolean; schemaTypes?: string[]; robotsMeta?: string; canonicalUrl?: string; metaDescriptionPresent?: boolean; crawlStatus?: string; wordCount?: number; markdownChars?: number };
 }
 

@@ -12,7 +12,7 @@ async function readJsonResponse(response: Response) {
   }
 }
 
-export type ReportHistoryRun = { run_id: string; brand?: string; market?: string; domain?: string; completed_at_epoch?: number; created_at_epoch?: number; query_count?: number; citation_count?: number; owned_pages_scoreable?: number; external_pages_scoreable?: number; crawl_success_rate?: number; serpapi_enabled?: boolean; source_run_id?: string; portfolio_id?: string; ai_hygiene?: unknown };
+export type ReportHistoryRun = { run_id: string; brand?: string; market?: string; domain?: string; completed_at_epoch?: number; created_at_epoch?: number; query_count?: number; citation_count?: number; owned_pages_scoreable?: number; owned_inventory_selected?: number; owned_query_mapped_unique?: number; external_pages_scoreable?: number; crawl_success_rate?: number; serpapi_enabled?: boolean; source_run_id?: string; portfolio_id?: string; ai_hygiene?: unknown };
 
 export async function fetchLatestReport(brand: string, market: string): Promise<ReportBundle> {
   const params = new URLSearchParams({ brand, market });
@@ -66,6 +66,7 @@ export type RefreshEvidencePayload = {
   maxOwnedPagesPerQuery: number;
   maxExternalCitationsPerQuery: number;
   maxOwnedUrls?: number;
+  maxOwnedInventoryUrls?: number;
   maxExternalUrls?: number;
   enableSerpapi: boolean;
   enableOwnedCrawl: boolean;
@@ -170,7 +171,8 @@ export async function triggerFullRefresh(payload: { brand: string; market: strin
     queryLimit: payload.auditSize,
     maxOwnedPagesPerQuery: 3,
     maxExternalCitationsPerQuery: 3,
-    maxOwnedUrls: 100,
+    maxOwnedInventoryUrls: 60,
+    maxOwnedUrls: 60,
     maxExternalUrls: 150,
     enableSerpapi: payload.externalEvidence === 'refresh_serp_evidence',
     enableOwnedCrawl: payload.ownedUrlDiscovery !== 'previous_inventory',

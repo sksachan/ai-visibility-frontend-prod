@@ -18,6 +18,7 @@ export function QueryDiagnostics() {
 export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle; onOpenCms?: (url: string) => void }) {
   const [search, setSearch] = useState('');
   const [journey, setJourney] = useState('All');
+  const [scope, setScope] = useState('All audited inventory URLs');
   const [sort, setSort] = useState<SortState>({ key: 'geoScore', direction: 'asc' });
   const journeys = useMemo(() => unique(report.ownedPages.map((p) => p.journeyCategory)), [report.ownedPages]);
   const filtered = useMemo(() => {
@@ -25,7 +26,8 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
     const rows = report.ownedPages.filter((page) => {
       const matchesSearch = !term || [page.url, page.title, page.journeyCategory, ...page.relatedQueries.map((q) => q.query), ...page.diagnostics].join(' ').toLowerCase().includes(term);
       const matchesJourney = journey === 'All' || page.journeyCategory === journey;
-      return matchesSearch && matchesJourney;
+      const matchesScope = scope === 'All audited inventory URLs' || (scope === 'Mapped to current query portfolio' ? Boolean(page.queryMapped || page.relatedQueries.length) : !(page.queryMapped || page.relatedQueries.length));
+      return matchesSearch && matchesJourney && matchesScope;
     });
     return [...rows].sort((a, b) => {
       const dir = sort.direction === 'asc' ? 1 : -1;
@@ -34,7 +36,7 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
       if (typeof av === 'string' || typeof bv === 'string') return String(av).localeCompare(String(bv)) * dir;
       return (Number(av) - Number(bv)) * dir;
     });
-  }, [report.ownedPages, search, journey, sort]);
+  }, [report.ownedPages, search, journey, scope, sort]);
 
   function toggle(key: SortKey) {
     setSort((current) => current.key === key ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' });
@@ -43,12 +45,17 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
   return (
     <Card>
       <SectionTitle eyebrow="Owned URL GEO readiness" title={`Owned-page readiness records (${filtered.length}/${report.ownedPages.length})`}>
-        Sort each column using the arrow in the header. Use the CMS CTA to jump directly to page-level CMS recommendations for the selected URL.
+        Site-level readiness includes inventory URLs selected from sitemap/robots plus query-mapped pages. Use the scope filter to separate broad inventory readiness from pages mapped to the current query portfolio.
       </SectionTitle>
       <Controls>
         <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Search URL, title, query, gap..." value={search} onChange={(event) => setSearch(event.target.value)} />
         <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={journey} onChange={(event) => setJourney(event.target.value)}>
           <option>All</option>{journeys.map((item) => <option key={item}>{item}</option>)}
+        </select>
+        <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={scope} onChange={(event) => setScope(event.target.value)}>
+          <option>All audited inventory URLs</option>
+          <option>Mapped to current query portfolio</option>
+          <option>Inventory only</option>
         </select>
       </Controls>
       <OwnedTable pages={filtered} sort={sort} onSort={toggle} onOpenCms={onOpenCms} />
@@ -86,7 +93,7 @@ function OwnedTable({ pages, sort, onSort, onOpenCms }: { pages: OwnedPage[]; so
         <tbody className="divide-y divide-slate-100">
           {pages.map((page) => (
             <tr key={page.url} className="align-top">
-              <td className="max-w-sm px-3 py-4 font-medium text-slate-950"><p className="break-all">{page.url}</p>{page.title && <p className="mt-1 text-xs text-slate-500">{page.title}</p>}</td>
+              <td className="max-w-sm px-3 py-4 font-medium text-slate-950"><p className="break-all">{page.url}</p>{page.title && <p className="mt-1 text-xs text-slate-500">{page.title}</p>}<p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{page.queryMapped ? 'Query mapped' : 'Inventory only'} · {page.inventorySource || 'sitemap_inventory'}</p></td>
               <td className="max-w-xs px-3 py-4 text-slate-600">{page.journeyCategory}</td>
               <td className="px-3 py-4 font-semibold text-slate-950">{page.geoScore}</td><td className="px-3 py-4">{page.clarity}</td><td className="px-3 py-4">{page.semanticDepth}</td><td className="px-3 py-4">{page.structure}</td><td className="px-3 py-4">{page.evidence}</td><td className="px-3 py-4">{page.freshness}</td><td className="px-3 py-4">{page.faqReadiness ?? 0}</td><td className="px-3 py-4">{page.relatedQueries.length}</td>
               <td className="px-3 py-4"><TechnicalSignals page={page} /></td>

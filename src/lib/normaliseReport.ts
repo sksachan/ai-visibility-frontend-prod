@@ -423,7 +423,9 @@ function mapOwnedPages(cmsPayload: AnyRecord): OwnedPage[] {
       diagnostics: gaps.length ? gaps : ['No dimension gaps supplied'],
       recommendedHtmlChanges: htmlChanges.map((change) => asString(firstDefined(change.proposed_heading, change.cms_module_type, change.recommendation_id))).filter(Boolean),
       representativeCitations: citations,
-technicalSignals: technicalSignalsFromPage(page)
+      queryMapped: Boolean(firstDefined(page.query_mapped, page.queryMapped, related.length > 0)),
+      inventorySource: asString(firstDefined(page.inventory_source, page.inventorySource), related.length ? 'query_mapped' : 'sitemap_inventory'),
+      technicalSignals: technicalSignalsFromPage(page)
     };
   });
 }
@@ -558,7 +560,7 @@ function mapFrontendPreviewBundle(source: AnyRecord): ReportBundle | null {
   const representativeCitations = asArray<AnyRecord>(firstDefined(source.representative_citation_examples, visibility.representative_citation_examples));
   const queries = mapQueries({ query_level_source_gaps: mergedQueryRows, representative_citation_examples: representativeCitations });
 
-  const ownedPages = mapOwnedPages({ pages: firstDefined(source.owned_readiness, source.owned_pages) });
+  const ownedPages = mapOwnedPages({ pages: firstDefined(source.owned_readiness, source.owned_pages, asRecord(source.owned_pages_full).pages) });
   const cmsModules = mapCmsModules({ modules: firstDefined(source.cms_ready_content_modules, source.cms_modules, asRecord(source.cms_ready_content_modules).modules) });
   const prSynthesis = parseRecord(source.pr_strategy_synthesis);
   const prOpportunities = mapPrActions({ recommended_actions: firstDefined(source.pr_opportunities, prSynthesis.recommended_actions, prSynthesis.opportunities) });

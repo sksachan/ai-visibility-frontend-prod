@@ -35,7 +35,7 @@ const stageLabels: Record<string, string> = {
   serpapi_collection_running: 'Collecting fresh AI citations',
   serpapi_collection_completed: 'AI citation collection completed',
   crawl_refresh_running: 'Refreshing crawl evidence',
-  owned_crawl_running: 'Crawling mapped owned URLs',
+  owned_crawl_running: 'Crawling owned inventory URLs',
   owned_crawl_completed: 'Owned URL crawl completed',
   external_crawl_running: 'Crawling top external citation URLs',
   external_crawl_completed: 'External citation crawl completed',
@@ -130,7 +130,7 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
   const [sitemapUrl, setSitemapUrl] = useState('');
   const [maxOwnedPagesPerQuery, setMaxOwnedPagesPerQuery] = useState(3);
   const [maxExternalCitationsPerQuery, setMaxExternalCitationsPerQuery] = useState(3);
-  const [maxOwnedUrls, setMaxOwnedUrls] = useState(100);
+  const [maxOwnedInventoryUrls, setMaxOwnedInventoryUrls] = useState(60);
   const [maxExternalUrls, setMaxExternalUrls] = useState(150);
   const [enableSerpapi, setEnableSerpapi] = useState(false);
   const [enableOwnedCrawl, setEnableOwnedCrawl] = useState(false);
@@ -199,7 +199,7 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
         queryLimit,
         maxOwnedPagesPerQuery,
         maxExternalCitationsPerQuery,
-        maxOwnedUrls,
+        maxOwnedInventoryUrls,
         maxExternalUrls,
         enableSerpapi,
         enableOwnedCrawl,
@@ -281,15 +281,16 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
           <label className="text-sm font-medium text-slate-700">Query limit
             <input type="number" min={1} max={100} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={queryLimit} onChange={(e) => setQueryLimit(Number(e.target.value))} />
           </label>
-          <label className="text-sm font-medium text-slate-700">Owned URLs per query
+          <label className="text-sm font-medium text-slate-700">Mapped owned URLs per query
             <input type="number" min={1} max={10} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={maxOwnedPagesPerQuery} onChange={(e) => setMaxOwnedPagesPerQuery(Number(e.target.value))} />
+            <span className="mt-1 block text-xs font-normal text-slate-500">Used only for query gap, CMS and opportunity mapping. It does not cap site-level GEO readiness scoring.</span>
           </label>
           <label className="text-sm font-medium text-slate-700">External citations per query
             <input type="number" min={1} max={10} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={maxExternalCitationsPerQuery} onChange={(e) => setMaxExternalCitationsPerQuery(Number(e.target.value))} />
           </label>
-          <label className="text-sm font-medium text-slate-700">Max owned URLs audited
-            <input type="number" min={1} max={500} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={maxOwnedUrls} onChange={(e) => setMaxOwnedUrls(Number(e.target.value))} />
-            <span className="mt-1 block text-xs font-normal text-slate-500">Caps unique owned URLs after query mapping. Use 100 for a full 50-query audit.</span>
+          <label className="text-sm font-medium text-slate-700">Max owned inventory URLs to GEO audit
+            <input type="number" min={1} max={500} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={maxOwnedInventoryUrls} onChange={(e) => setMaxOwnedInventoryUrls(Number(e.target.value))} />
+            <span className="mt-1 block text-xs font-normal text-slate-500">Site-level inventory sample from sitemap/robots. These pages are crawled and GEO scored even if not mapped to a query.</span>
           </label>
           <label className="text-sm font-medium text-slate-700">Max external URLs crawled
             <input type="number" min={1} max={500} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={maxExternalUrls} onChange={(e) => setMaxExternalUrls(Number(e.target.value))} />
