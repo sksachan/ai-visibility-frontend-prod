@@ -131,10 +131,8 @@ function TechnicalSignals({ page }: { page: OwnedPage }) {
   const tech = page.technicalSignals || {};
   const schemaTypes = tech.schemaTypes || [];
   const jsonLdQuality = tech.jsonLdPresent
-    ? (schemaTypes.length >= 2 || (page.structure ?? 0) >= 2 ? 'Present · good quality' : 'Present · partial')
-    : (page.structure ?? 0) > 0 || schemaTypes.length
-      ? 'Partial · needs review'
-      : 'Missing';
+    ? (schemaTypes.length >= 2 ? 'Present · good quality' : 'Present · partial')
+    : 'Missing';
   const tone = jsonLdQuality.startsWith('Present · good') ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
     : jsonLdQuality.startsWith('Present') || jsonLdQuality.startsWith('Partial') ? 'bg-amber-50 text-amber-800 border-amber-100'
     : 'bg-red-50 text-red-800 border-red-100';

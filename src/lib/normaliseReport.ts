@@ -355,10 +355,29 @@ function pageUrl(item: AnyRecord): string {
 function technicalSignalsFromPage(page: AnyRecord): OwnedPage['technicalSignals'] {
   const tech = asRecord(firstDefined(page.technical_signals, page.technicalSignals));
   const metadata = asRecord(page.metadata);
-  const schemaTypes = asArray<string>(firstDefined(tech.schema_types, tech.schemaTypes, page.schema_types_detected, page.schemaTypesDetected));
-  const structureScore = asNumber(firstDefined(page.structure, page.structured_data, asRecord(page.geo_dimensions).structured_extractability));
+  const schemaTypes = asArray<string>(firstDefined(
+    tech.schema_types,
+    tech.schemaTypes,
+    page.schema_types,
+    page.schemaTypes,
+    page.schema_types_detected,
+    page.schemaTypesDetected
+  )).filter(Boolean);
+
+  // Important: do not infer JSON-LD presence from GEO structure score.
+  // A page can be well structured for humans without having JSON-LD/schema.
+  // Only explicit crawl/audit signals should mark JSON-LD as present.
+  const explicitJsonLd = firstDefined(
+    tech.json_ld_present,
+    tech.jsonLdPresent,
+    tech.has_json_ld,
+    page.json_ld_present,
+    page.jsonLdPresent,
+    page.has_json_ld
+  );
+  const blockCount = asNumber(firstDefined(tech.json_ld_block_count, tech.jsonLdBlockCount, page.json_ld_block_count, page.schema_block_count));
   return {
-    jsonLdPresent: bool(firstDefined(tech.json_ld_present, tech.jsonLdPresent, page.json_ld_present, page.has_json_ld)) || schemaTypes.length > 0 || structureScore > 0,
+    jsonLdPresent: bool(explicitJsonLd) || blockCount > 0 || schemaTypes.length > 0,
     schemaTypes,
     robotsMeta: asString(firstDefined(tech.robots_meta, tech.robotsMeta, page.robots_meta, metadata.robots)),
     canonicalUrl: asString(firstDefined(tech.canonical_url, tech.canonicalUrl, page.canonical_url, page.final_url, page.resolved_url)),
@@ -389,6 +408,37 @@ function buildOwnedTechnicalIndex(source: AnyRecord): Map<string, OwnedPage['tec
 function extractAiHygiene(source: AnyRecord): AiHygiene | undefined {
   const hygiene = asRecord(firstDefined(source.ai_discoverability_hygiene, source.site_ai_hygiene, asRecord(source.executive).ai_discoverability_hygiene, asRecord(source.evidence_collection).site_ai_hygiene));
   return Object.keys(hygiene).length ? hygiene as AiHygiene : undefined;
+}
+
+function deriveAiHygieneFromOwnedPages(ownedPages: OwnedPage[], fallback?: AiHygiene): AiHygiene | undefined {
+  if (fallback) return fallback;
+  if (!ownedPages.length) return undefined;
+  const total = ownedPages.length;
+  const pagesWithJsonLd = ownedPages.filter((p) => Boolean(p.technicalSignals?.jsonLdPresent)).length;
+  const coverage = total ? Math.round((pagesWithJsonLd / total) * 1000) / 10 : 0;
+  const missing = ownedPages.filter((p) => !p.technicalSignals?.jsonLdPresent).slice(0, 20).map((p) => ({ url: p.url, title: p.title }));
+  const schemaCounts = new Map<string, number>();
+  for (const page of ownedPages) {
+    for (const schema of page.technicalSignals?.schemaTypes || []) {
+      const key = String(schema).trim();
+      if (key) schemaCounts.set(key, (schemaCounts.get(key) || 0) + 1);
+    }
+  }
+  const priority = coverage < 50 ? 'high' : coverage < 80 ? 'medium' : 'low';
+  return {
+    priority,
+    robots_txt: { status: 'not supplied' },
+    llms_txt: { status: 'not supplied' },
+    structured_data: {
+      owned_pages_total: total,
+      pages_with_schema: schemaCounts.size ? pagesWithJsonLd : pagesWithJsonLd,
+      pages_with_json_ld: pagesWithJsonLd,
+      coverage_pct: coverage,
+      schema_types_detected: Array.from(schemaCounts.entries()).sort((a, b) => b[1] - a[1]),
+      pages_missing_json_ld: missing
+    },
+    summary: `JSON-LD/schema coverage: ${pagesWithJsonLd}/${total} owned pages (${coverage}%). Robots.txt and LLMs.txt were not supplied in this report bundle.`
+  };
 }
 
 function mapOwnedPages(cmsPayload: AnyRecord): OwnedPage[] {
@@ -641,7 +691,7 @@ function mapFrontendPreviewBundle(source: AnyRecord): ReportBundle | null {
     cmsModules,
     prOpportunities,
     actionChecklist,
-    aiHygiene: extractAiHygiene(source),
+    aiHygiene: deriveAiHygieneFromOwnedPages(ownedPages, extractAiHygiene(source)),
     parserMeta: {
       source: 'bodhi-output',
       parsedAt: new Date().toISOString(),
@@ -922,7 +972,7 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
       winningSourcePatterns: asArray<AnyRecord>(sourceLandscape.winning_source_patterns).map((item) => ({ sourceType: asString(firstDefined(item.sourceType, item.source_type)), citationCount: asNumber(firstDefined(item.citationCount, item.citation_count)), winningPattern: asString(firstDefined(item.winningPattern, item.winning_pattern)) }))
     },
     trend: [], queries, ownedPages: Array.from(ownedMap.values()), cmsModules, prOpportunities, actionChecklist, queryWorkbench: queryWorkbench as any,
-    aiHygiene: extractAiHygiene(source),
+    aiHygiene: deriveAiHygieneFromOwnedPages(Array.from(ownedMap.values()), extractAiHygiene(source)),
     methodology: asRecord(source.methodology),
     parserMeta: { source: 'canonical-report', parsedAt: new Date().toISOString(), queryCount: queries.length, ownedPageCount: ownedMap.size, cmsModuleCount: cmsModules.length, prOpportunityCount: prOpportunities.length, actionCount: actionChecklist.length, warnings: [] }
   };
@@ -1050,7 +1100,7 @@ export function normaliseReport(raw: unknown): ReportBundle {
     cmsModules,
     prOpportunities,
     actionChecklist,
-    aiHygiene: extractAiHygiene(root),
+    aiHygiene: deriveAiHygieneFromOwnedPages(ownedPages, extractAiHygiene(root)),
     parserMeta: {
       source: 'bodhi-output',
       parsedAt: new Date().toISOString(),
