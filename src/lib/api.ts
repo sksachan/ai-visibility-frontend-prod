@@ -12,6 +12,8 @@ async function readJsonResponse(response: Response) {
   }
 }
 
+export type ReportHistoryRun = { run_id: string; brand?: string; market?: string; domain?: string; completed_at_epoch?: number; created_at_epoch?: number; query_count?: number; citation_count?: number; owned_pages_scoreable?: number; external_pages_scoreable?: number; crawl_success_rate?: number; serpapi_enabled?: boolean; source_run_id?: string; portfolio_id?: string; ai_hygiene?: unknown };
+
 export async function fetchLatestReport(brand: string, market: string): Promise<ReportBundle> {
   const params = new URLSearchParams({ brand, market });
   const response = await fetch(`/api/bodhi/latest?${params.toString()}`, {
@@ -27,6 +29,23 @@ export async function fetchLatestReport(brand: string, market: string): Promise<
   }
 
   return normaliseReport(payload);
+}
+
+
+
+export async function fetchReportByRunId(runId: string): Promise<ReportBundle> {
+  const response = await fetch(`/api/evidence/reports/${encodeURIComponent(runId)}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+  const payload = await readJsonResponse(response);
+  if (!response.ok) throw new Error(payload?.error || payload?.message || `${response.status} ${response.statusText}`);
+  return normaliseReport(payload);
+}
+
+export async function fetchReportHistory(brand: string, market: string): Promise<ReportHistoryRun[]> {
+  const params = new URLSearchParams({ brand, market, limit: '30' });
+  const response = await fetch(`/api/evidence/reports/history?${params.toString()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+  const payload = await readJsonResponse(response);
+  if (!response.ok) throw new Error(payload?.error || payload?.message || `${response.status} ${response.statusText}`);
+  return Array.isArray(payload?.runs) ? payload.runs : [];
 }
 
 export type RefreshEvidencePayload = {

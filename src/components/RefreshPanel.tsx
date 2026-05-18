@@ -124,7 +124,7 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
   const [queriesPerTopic, setQueriesPerTopic] = useState(6);
   const [language, setLanguage] = useState('English');
   const [portfolioGoal, setPortfolioGoal] = useState('AI answer visibility audit query portfolio.');
-  const [sitemapUrl, setSitemapUrl] = useState('https://www.nissan.co.jp/sitemap.xml');
+  const [sitemapUrl, setSitemapUrl] = useState('');
   const [maxOwnedPagesPerQuery, setMaxOwnedPagesPerQuery] = useState(3);
   const [maxExternalCitationsPerQuery, setMaxExternalCitationsPerQuery] = useState(3);
   const [enableSerpapi, setEnableSerpapi] = useState(false);
@@ -283,8 +283,8 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
           <label className="text-sm font-medium text-slate-700">Language
             <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={language} onChange={(e) => setLanguage(e.target.value)} />
           </label>
-          <label className="text-sm font-medium text-slate-700 md:col-span-2">Sitemap URL
-            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={sitemapUrl} onChange={(e) => setSitemapUrl(e.target.value)} />
+          <label className="text-sm font-medium text-slate-700 md:col-span-2">Sitemap URL override (optional)
+            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={sitemapUrl} onChange={(e) => setSitemapUrl(e.target.value)} placeholder="Leave blank to auto-discover via robots.txt and common sitemap paths" />
           </label>
           <label className="text-sm font-medium text-slate-700 md:col-span-3">Seed topics
             <textarea className="mt-1 min-h-20 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={seedTopics} onChange={(e) => setSeedTopics(e.target.value)} placeholder="Optional; one topic per line or free text" />

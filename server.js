@@ -360,6 +360,28 @@ app.get('/api/bodhi/latest', async (req, res) => {
   });
 });
 
+
+app.get('/api/evidence/reports/history', async (req, res) => {
+  const base = evidenceBase();
+  if (!base) { res.status(503).json({ error: 'EVIDENCE_SERVICE_URL is not configured on the frontend Railway service.' }); return; }
+  const params = new URLSearchParams({ brand: String(req.query.brand || process.env.DEFAULT_BRAND || 'Nissan'), market: String(req.query.market || process.env.DEFAULT_MARKET || 'Japan'), limit: String(req.query.limit || '30') });
+  try {
+    const response = await fetch(`${base}/reports/history?${params.toString()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    const text = await response.text();
+    res.status(response.status).type(response.headers.get('content-type') || 'application/json').send(text);
+  } catch (error) { res.status(502).json({ error: error instanceof Error ? error.message : String(error), evidenceServiceUrl: base }); }
+});
+
+app.get('/api/evidence/reports/:runId', async (req, res) => {
+  const base = evidenceBase();
+  if (!base) { res.status(503).json({ error: 'EVIDENCE_SERVICE_URL is not configured on the frontend Railway service.' }); return; }
+  try {
+    const response = await fetch(`${base}/reports/${encodeURIComponent(req.params.runId)}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    const text = await response.text();
+    res.status(response.status).type(response.headers.get('content-type') || 'application/json').send(text);
+  } catch (error) { res.status(502).json({ error: error instanceof Error ? error.message : String(error), evidenceServiceUrl: base }); }
+});
+
 app.post('/api/evidence/refresh', async (req, res) => {
   const base = evidenceBase();
   if (!base) {

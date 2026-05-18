@@ -89,6 +89,14 @@ export interface QueryDiagnostic {
   recommendedMove: string;
 }
 
+export interface AiHygiene {
+  priority?: string;
+  summary?: string;
+  robots_txt?: { status?: string; url?: string; sitemap_entries_count?: number };
+  llms_txt?: { status?: string; url?: string; chars?: number };
+  structured_data?: { owned_pages_total?: number; pages_with_schema?: number; pages_with_json_ld?: number; coverage_pct?: number; schema_types_detected?: Array<[string, number]>; pages_missing_json_ld?: Array<{ url?: string; title?: string }> };
+}
+
 export interface OwnedPage {
   url: string;
   title?: string;
@@ -108,6 +116,7 @@ export interface OwnedPage {
   diagnostics: string[];
   recommendedHtmlChanges?: string[];
   representativeCitations?: CitationExample[];
+  technicalSignals?: { jsonLdPresent?: boolean; schemaTypes?: string[]; robotsMeta?: string; canonicalUrl?: string; metaDescriptionPresent?: boolean; crawlStatus?: string; wordCount?: number; markdownChars?: number };
 }
 
 export interface CmsCopyModule {
@@ -240,4 +249,6 @@ export interface ReportBundle {
   actionChecklist: ActionItem[];
   queryWorkbench?: QueryWorkbenchItem[];
   parserMeta?: ParserMeta;
+  aiHygiene?: AiHygiene;
+  methodology?: Record<string, unknown>;
 }

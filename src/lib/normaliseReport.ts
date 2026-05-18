@@ -1,4 +1,4 @@
-import type { ActionItem, BrandTopicScorecardRow, CitationExample, CmsCopyModule, OwnedPage, QueryDiagnostic, RecommendationModule, ReportBundle, Severity, SourceTypeCount, Status } from '../types/report';
+import type { ActionItem, AiHygiene, BrandTopicScorecardRow, CitationExample, CmsCopyModule, OwnedPage, QueryDiagnostic, RecommendationModule, ReportBundle, Severity, SourceTypeCount, Status } from '../types/report';
 
 type AnyRecord = Record<string, any>;
 
@@ -343,6 +343,11 @@ function mapQueries(prPayload: AnyRecord): QueryDiagnostic[] {
   });
 }
 
+function extractAiHygiene(source: AnyRecord): AiHygiene | undefined {
+  const hygiene = asRecord(firstDefined(source.ai_discoverability_hygiene, source.site_ai_hygiene, asRecord(source.executive).ai_discoverability_hygiene, asRecord(source.evidence_collection).site_ai_hygiene));
+  return Object.keys(hygiene).length ? hygiene as AiHygiene : undefined;
+}
+
 function mapOwnedPages(cmsPayload: AnyRecord): OwnedPage[] {
   return asArray<AnyRecord>(firstDefined(cmsPayload.pages, cmsPayload.owned_readiness, cmsPayload.owned_pages, cmsPayload.rows)).map((page, index) => {
     const readiness = Object.keys(asRecord(page.owned_geo_readiness)).length ? asRecord(page.owned_geo_readiness) : page;
@@ -374,7 +379,17 @@ function mapOwnedPages(cmsPayload: AnyRecord): OwnedPage[] {
       faqReadiness: asNumber(dimensions.faq_readiness),
       diagnostics: gaps.length ? gaps : ['No dimension gaps supplied'],
       recommendedHtmlChanges: htmlChanges.map((change) => asString(firstDefined(change.proposed_heading, change.cms_module_type, change.recommendation_id))).filter(Boolean),
-      representativeCitations: citations
+      representativeCitations: citations,
+      technicalSignals: {
+        jsonLdPresent: bool(firstDefined(page.json_ld_present, page.has_json_ld)) || asArray<string>(page.schema_types_detected).length > 0,
+        schemaTypes: asArray<string>(page.schema_types_detected),
+        robotsMeta: asString(firstDefined(page.robots_meta, asRecord(page.metadata).robots)),
+        canonicalUrl: asString(firstDefined(page.canonical_url, page.final_url, page.resolved_url)),
+        metaDescriptionPresent: Boolean(firstDefined(page.meta_description, asRecord(page.metadata).description, asRecord(page.metadata)['og:description'])),
+        crawlStatus: asString(page.crawl_status),
+        wordCount: asNumber(page.word_count),
+        markdownChars: asNumber(page.markdown_chars)
+      }
     };
   });
 }
@@ -590,6 +605,7 @@ function mapFrontendPreviewBundle(source: AnyRecord): ReportBundle | null {
     cmsModules,
     prOpportunities,
     actionChecklist,
+    aiHygiene: extractAiHygiene(source),
     parserMeta: {
       source: 'bodhi-output',
       parsedAt: new Date().toISOString(),
@@ -866,6 +882,8 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
       winningSourcePatterns: asArray<AnyRecord>(sourceLandscape.winning_source_patterns).map((item) => ({ sourceType: asString(firstDefined(item.sourceType, item.source_type)), citationCount: asNumber(firstDefined(item.citationCount, item.citation_count)), winningPattern: asString(firstDefined(item.winningPattern, item.winning_pattern)) }))
     },
     trend: [], queries, ownedPages: Array.from(ownedMap.values()), cmsModules, prOpportunities, actionChecklist, queryWorkbench: queryWorkbench as any,
+    aiHygiene: extractAiHygiene(source),
+    methodology: asRecord(source.methodology),
     parserMeta: { source: 'canonical-report', parsedAt: new Date().toISOString(), queryCount: queries.length, ownedPageCount: ownedMap.size, cmsModuleCount: cmsModules.length, prOpportunityCount: prOpportunities.length, actionCount: actionChecklist.length, warnings: [] }
   };
 }
@@ -992,6 +1010,7 @@ export function normaliseReport(raw: unknown): ReportBundle {
     cmsModules,
     prOpportunities,
     actionChecklist,
+    aiHygiene: extractAiHygiene(root),
     parserMeta: {
       source: 'bodhi-output',
       parsedAt: new Date().toISOString(),

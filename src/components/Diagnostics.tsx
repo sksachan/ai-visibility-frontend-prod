@@ -80,7 +80,7 @@ function OwnedTable({ pages, sort, onSort, onOpenCms }: { pages: OwnedPage[]; so
             <th className="px-3 py-3"><SortHeader label="Freshness" sortKey="freshness" sort={sort} onSort={onSort} /></th>
             <th className="px-3 py-3"><SortHeader label="FAQ" sortKey="faqReadiness" sort={sort} onSort={onSort} /></th>
             <th className="px-3 py-3"><SortHeader label="Related queries" sortKey="relatedQueries" sort={sort} onSort={onSort} /></th>
-            <th className="px-3 py-3">CMS</th>
+            <th className="px-3 py-3">Technical signals</th><th className="px-3 py-3">CMS</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -89,6 +89,7 @@ function OwnedTable({ pages, sort, onSort, onOpenCms }: { pages: OwnedPage[]; so
               <td className="max-w-sm px-3 py-4 font-medium text-slate-950"><p className="break-all">{page.url}</p>{page.title && <p className="mt-1 text-xs text-slate-500">{page.title}</p>}</td>
               <td className="max-w-xs px-3 py-4 text-slate-600">{page.journeyCategory}</td>
               <td className="px-3 py-4 font-semibold text-slate-950">{page.geoScore}</td><td className="px-3 py-4">{page.clarity}</td><td className="px-3 py-4">{page.semanticDepth}</td><td className="px-3 py-4">{page.structure}</td><td className="px-3 py-4">{page.evidence}</td><td className="px-3 py-4">{page.freshness}</td><td className="px-3 py-4">{page.faqReadiness ?? 0}</td><td className="px-3 py-4">{page.relatedQueries.length}</td>
+              <td className="px-3 py-4"><TechnicalSignals page={page} /></td>
               <td className="px-3 py-4"><button onClick={() => onOpenCms?.(page.url)} className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white">Open CMS</button></td>
             </tr>
           ))}
@@ -116,4 +117,17 @@ function OwnedPageCard({ page }: { page: OwnedPage }) {
       ) : null}
     </div>
   );
+}
+
+
+function TechnicalSignals({ page }: { page: OwnedPage }) {
+  const tech = page.technicalSignals;
+  if (!tech) return <span className="text-xs text-slate-400">Not supplied</span>;
+  const signals = [
+    { label: 'JSON-LD', ok: Boolean(tech.jsonLdPresent) },
+    { label: 'Canonical', ok: Boolean(tech.canonicalUrl) },
+    { label: 'Meta desc', ok: Boolean(tech.metaDescriptionPresent) },
+    { label: 'Crawled', ok: tech.crawlStatus === 'success' }
+  ];
+  return <div className="flex min-w-[180px] flex-wrap gap-1">{signals.map((s) => <span key={s.label} className={`rounded-full px-2 py-1 text-[11px] font-semibold ${s.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{s.label}</span>)}</div>;
 }

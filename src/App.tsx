@@ -7,13 +7,15 @@ import { OwnedUrlReadiness } from './components/Diagnostics';
 import { QueryWorkbench } from './components/QueryWorkbench';
 import { ActionChecklist, CmsRecommendations, PrRecommendations } from './components/Recommendations';
 import { RefreshPanel } from './components/RefreshPanel';
+import { RunHistory } from './components/RunHistory';
+import { MethodologyAppendix } from './components/MethodologyAppendix';
 import { fetchLatestReport, fetchRefreshStatus, type RunStatusSummary } from './lib/api';
 import { exportReportToPdf } from './lib/pdf';
 import { normaliseReport } from './lib/normaliseReport';
 import type { ReportBundle } from './types/report';
 import { mockReport } from './data/mockReport';
 
-type Tab = 'executive' | 'workbench' | 'matrix' | 'owned' | 'cms' | 'pr' | 'actions' | 'refresh';
+type Tab = 'executive' | 'workbench' | 'matrix' | 'owned' | 'cms' | 'pr' | 'actions' | 'runs' | 'appendix' | 'refresh';
 type Notice = { tone: 'success' | 'warning' | 'error'; message: string } | null;
 
 const tabs: Array<{ id: Tab; label: string }> = [
@@ -24,6 +26,8 @@ const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'cms', label: 'CMS' },
   { id: 'pr', label: 'PR' },
   { id: 'actions', label: 'Action checklist' },
+  { id: 'runs', label: 'Previous runs' },
+  { id: 'appendix', label: 'Appendix' },
   { id: 'refresh', label: 'Refresh Evidence' }
 ];
 
@@ -168,6 +172,8 @@ export default function App() {
         {activeTab === 'cms' && <CmsRecommendations report={report} highlightUrl={highlightCmsUrl} />}
         {activeTab === 'pr' && <PrRecommendations report={report} />}
         {activeTab === 'actions' && <ActionChecklist report={report} />}
+        {activeTab === 'runs' && <RunHistory brand={brand} market={market} onLoad={(next, row) => { setReport(next); setActiveTab('executive'); setFooterMessage(parseMessage(next, `Loaded previous run ${row.run_id}`)); setNotice({ tone: 'success', message: `Loaded previous report run ${row.run_id}.` }); }} />}
+        {activeTab === 'appendix' && <MethodologyAppendix report={report} />}
         {activeTab === 'refresh' && <RefreshPanel brand={report.brand} market={report.market} />}
       </main>
 

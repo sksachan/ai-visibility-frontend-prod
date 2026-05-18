@@ -34,6 +34,8 @@ export function ExecutiveReport({ report }: { report: ReportBundle }) {
         <MetricCard label="Owned pages audited" value={metrics.ownedPageCount ?? report.ownedPages.length} />
       </div>
 
+      <AiHygieneCard report={report} />
+
       <BrandTopicScorecard rows={report.executive.brandTopicScorecard ?? []} />
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -63,4 +65,31 @@ function Narrative({ title, items }: { title: string; items: string[] }) {
       </div>
     </Card>
   );
+}
+
+
+function AiHygieneCard({ report }: { report: ReportBundle }) {
+  const hygiene = report.aiHygiene;
+  if (!hygiene) return null;
+  const sd = hygiene.structured_data || {};
+  const priority = String(hygiene.priority || 'medium').toLowerCase();
+  const priorityClass = priority === 'high' ? 'border-red-200 bg-red-50 text-red-900' : priority === 'low' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900';
+  return (
+    <Card className={priorityClass}>
+      <SectionTitle eyebrow="AI Discoverability Hygiene" title="Priority technical controls for AI crawler and citation readiness">
+        LLMs.txt is not mandatory for all AI systems, but it is useful as an explicit guidance layer for AI crawlers and agentic retrieval systems.
+      </SectionTitle>
+      <div className="grid gap-3 md:grid-cols-4">
+        <HygieneMetric label="Robots.txt" value={hygiene.robots_txt?.status || 'not supplied'} />
+        <HygieneMetric label="LLMs.txt" value={hygiene.llms_txt?.status || 'not supplied'} />
+        <HygieneMetric label="JSON-LD/schema coverage" value={`${sd.pages_with_json_ld ?? 0}/${sd.owned_pages_total ?? 0} pages · ${sd.coverage_pct ?? 0}%`} />
+        <HygieneMetric label="Priority" value={hygiene.priority || 'not supplied'} />
+      </div>
+      {hygiene.summary && <p className="mt-3 rounded-xl bg-white/60 p-3 text-sm leading-6">{hygiene.summary}</p>}
+    </Card>
+  );
+}
+
+function HygieneMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-white/70 p-3"><p className="text-xs uppercase tracking-wide opacity-70">{label}</p><p className="mt-1 font-semibold">{value}</p></div>;
 }
