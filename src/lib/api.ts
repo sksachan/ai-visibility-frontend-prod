@@ -136,19 +136,19 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
   }
 
   const runs = Array.isArray(data?.runs) ? data.runs : Array.isArray(data) ? data : [];
-  const terminal = new Set(['success', 'successful', 'completed', 'succeeded', 'report_bundle_ready', 'evidence_ready', 'failed', 'error', 'cancelled', 'canceled']);
+  const terminal = new Set(['success', 'successful', 'completed', 'succeeded', 'report_bundle_ready', 'failed', 'error', 'cancelled', 'canceled']);
   const isActive = (run: Record<string, unknown>) => {
-    const value = String(run.status ?? run.state ?? run.stage ?? '').toLowerCase();
+    const value = String(run.stage ?? run.status ?? run.state ?? '').toLowerCase();
     return value ? !terminal.has(value) : false;
   };
-  const activeRun = runs.find((run: Record<string, unknown>) => isActive(run)) || (!terminal.has(String(data?.status ?? data?.stage ?? data?.state ?? '').toLowerCase()) ? data : null);
+  const activeRun = runs.find((run: Record<string, unknown>) => isActive(run)) || (!terminal.has(String(data?.stage ?? data?.status ?? data?.state ?? '').toLowerCase()) ? data : null);
   const latestSuccess = runs.find((run: Record<string, unknown>) => ['success', 'successful', 'completed', 'succeeded', 'report_bundle_ready', 'evidence_ready'].includes(String(run.status ?? run.state ?? run.stage ?? '').toLowerCase()));
 
   return {
     active: Boolean(activeRun),
-    status: String(activeRun?.status ?? activeRun?.state ?? activeRun?.stage ?? data?.status ?? data?.state ?? data?.stage ?? ''),
-    stage: String(activeRun?.stage ?? data?.stage ?? ''),
-    runId: String(activeRun?.run_id ?? activeRun?.runId ?? data?.run_id ?? data?.runId ?? data?.target_run_id ?? data?.targetRunId ?? ''),
+    status: String(activeRun?.status ?? activeRun?.state ?? data?.status ?? data?.state ?? ''),
+    stage: String(activeRun?.stage ?? data?.stage ?? activeRun?.status ?? data?.status ?? ''),
+    runId: String(activeRun?.run_id ?? activeRun?.runId ?? data?.run_id ?? data?.runId ?? data?.target_run_id ?? data?.targetRunId ?? data?.evidence_run_id ?? data?.evidenceRunId ?? ''),
     jobId: String(activeRun?.job_id ?? activeRun?.jobId ?? data?.job_id ?? data?.jobId ?? ''),
     startedAt: String(activeRun?.started_at ?? activeRun?.startedAt ?? data?.started_at ?? data?.startedAt ?? ''),
     completedAt: String(data?.completed_at ?? data?.completedAt ?? ''),

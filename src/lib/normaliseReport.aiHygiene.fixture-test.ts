@@ -89,3 +89,44 @@ const crawlSignals = normaliseReport(canonicalBundle({
 }));
 assert(crawlSignals.aiHygiene?.structured_data?.pages_with_json_ld === 1, 'explicit per-page crawl signals should derive JSON-LD count');
 assert(crawlSignals.aiHygiene?.structured_data?.coverage_pct === 50, 'explicit per-page crawl signals should derive coverage percentage');
+
+const hygieneMissingPages = [
+  { url: 'https://www3.nissan.co.jp/test/missing-1.html', title: 'Missing 1' },
+  { url: 'https://www3.nissan.co.jp/test/missing-2.html', title: 'Missing 2' },
+  { url: 'https://www3.nissan.co.jp/test/missing-3.html', title: 'Missing 3' },
+  { url: 'https://www3.nissan.co.jp/test/missing-4.html', title: 'Missing 4' },
+  { url: 'https://www3.nissan.co.jp/test/missing-5.html', title: 'Missing 5' },
+  { url: 'https://www3.nissan.co.jp/test/missing-6.html', title: 'Missing 6' },
+  { url: 'https://www3.nissan.co.jp/test/missing-7.html', title: 'Missing 7' }
+];
+const hygieneAugmented = normaliseReport(canonicalBundle({
+  ai_discoverability_hygiene: {
+    priority: 'high',
+    robots_txt: { status: 'available' },
+    llms_txt: { status: 'not found' },
+    structured_data: {
+      owned_pages_total: 8,
+      pages_with_schema: 1,
+      pages_with_json_ld: 1,
+      coverage_pct: 12.5,
+      schema_types_detected: [['Organization', 1]],
+      pages_missing_json_ld: hygieneMissingPages
+    },
+    summary: 'Explicit 1/8 hygiene fixture'
+  },
+  query_workbench: [{
+    query_id: 'q001',
+    query: 'Fixture query',
+    journey_category: 'awareness',
+    current_ai_visibility: { score: 0, status: 'not_observed' },
+    mapped_owned_urls: [
+      { url: 'https://www3.nissan.co.jp/test/with-jsonld.html', current_geo_score_120: 40 },
+      { url: 'https://www3.nissan.co.jp/test/missing-1.html', current_geo_score_120: 30 },
+      { url: 'https://www3.nissan.co.jp/test/missing-2.html', current_geo_score_120: 25 },
+      { url: 'https://www3.nissan.co.jp/test/missing-3.html', current_geo_score_120: 20 }
+    ]
+  }]
+}));
+assert(hygieneAugmented.ownedPages.length === 8, 'hygiene missing-page list should augment owned URL rows to the audited total');
+assert(hygieneAugmented.ownedPages.find((page) => page.url.endsWith('/with-jsonld.html'))?.technicalSignals?.jsonLdPresent === true, 'non-missing page should be marked JSON-LD present when hygiene says 1/8 and seven URLs are missing');
+assert(hygieneAugmented.ownedPages.find((page) => page.url.endsWith('/missing-7.html'))?.technicalSignals?.jsonLdPresent === false, 'hygiene-only missing pages should be represented as JSON-LD missing');

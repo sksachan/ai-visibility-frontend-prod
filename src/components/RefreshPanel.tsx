@@ -71,7 +71,8 @@ function phaseForStage(stage?: string): Phase | null {
   if (s.includes('crawl')) return 'crawls';
   if (s === 'evidence_ready') return 'auditor';
   if (s.startsWith('auditor_')) return 'auditor';
-  if (s === 'report_bundle_ready' || terminalStages.has(s)) return 'report_ready';
+  if (s === 'report_bundle_ready') return 'report_ready';
+  if (terminalStages.has(s)) return 'report_ready';
   return null;
 }
 

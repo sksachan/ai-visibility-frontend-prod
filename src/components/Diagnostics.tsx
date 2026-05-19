@@ -26,7 +26,8 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
     const rows = report.ownedPages.filter((page) => {
       const matchesSearch = !term || [page.url, page.title, page.journeyCategory, ...page.relatedQueries.map((q) => q.query), ...page.diagnostics].join(' ').toLowerCase().includes(term);
       const matchesJourney = journey === 'All' || page.journeyCategory === journey;
-      const matchesScope = scope === 'All audited inventory URLs' || (scope === 'Mapped to current query portfolio' ? Boolean(page.queryMapped || page.relatedQueries.length) : !(page.queryMapped || page.relatedQueries.length));
+      const isQueryMapped = page.queryMapped === true;
+      const matchesScope = scope === 'All audited inventory URLs' || (scope === 'Mapped to current query portfolio' ? isQueryMapped : !isQueryMapped);
       return matchesSearch && matchesJourney && matchesScope;
     });
     return [...rows].sort((a, b) => {
