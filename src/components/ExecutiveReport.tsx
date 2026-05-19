@@ -84,6 +84,9 @@ function AiHygieneCard({ report }: { report: ReportBundle }) {
   const sd = hygiene.structured_data || {};
   const priority = String(hygiene.priority || 'medium').toLowerCase();
   const priorityClass = priority === 'high' ? 'border-red-200 bg-red-50 text-red-900' : priority === 'low' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900';
+  const schemaCoverage = sd.pages_with_json_ld === undefined || sd.coverage_pct === undefined
+    ? 'not checked'
+    : `${sd.pages_with_json_ld}/${sd.owned_pages_total ?? 0} pages · ${sd.coverage_pct}%`;
   return (
     <Card className={priorityClass}>
       <SectionTitle eyebrow="AI Discoverability Hygiene" title="Priority technical controls for AI crawler and citation readiness">
@@ -92,7 +95,7 @@ function AiHygieneCard({ report }: { report: ReportBundle }) {
       <div className="grid gap-3 md:grid-cols-4">
         <HygieneMetric label="Robots.txt" value={hygiene.robots_txt?.status || 'not supplied'} />
         <HygieneMetric label="LLMs.txt" value={hygiene.llms_txt?.status || 'not supplied'} />
-        <HygieneMetric label="JSON-LD/schema coverage" value={`${sd.pages_with_json_ld ?? 0}/${sd.owned_pages_total ?? 0} pages · ${sd.coverage_pct ?? 0}%`} />
+        <HygieneMetric label="JSON-LD/schema coverage" value={schemaCoverage} />
         <HygieneMetric label="Priority" value={hygiene.priority || 'not supplied'} />
       </div>
       {hygiene.summary && <p className="mt-3 rounded-xl bg-white/60 p-3 text-sm leading-6">{hygiene.summary}</p>}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, SectionTitle } from './ui';
 import { fetchReportHistory, fetchReportByRunId, type ReportHistoryRun } from '../lib/api';
 import type { ReportBundle } from '../types/report';
@@ -8,12 +8,12 @@ export function RunHistory({ brand, market, onLoad }: { brand: string; market: s
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true); setError('');
     try { setRows(await fetchReportHistory(brand, market)); }
     catch (err) { setError(err instanceof Error ? err.message : String(err)); }
     finally { setLoading(false); }
-  }
+  }, [brand, market]);
 
   async function loadRun(row: ReportHistoryRun) {
     setLoading(true); setError('');
@@ -22,7 +22,7 @@ export function RunHistory({ brand, market, onLoad }: { brand: string; market: s
     finally { setLoading(false); }
   }
 
-  useEffect(() => { void load(); }, [brand, market]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   return (
     <Card>

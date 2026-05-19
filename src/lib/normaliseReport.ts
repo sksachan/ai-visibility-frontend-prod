@@ -375,9 +375,17 @@ function technicalSignalsFromPage(page: AnyRecord): OwnedPage['technicalSignals'
     page.jsonLdPresent,
     page.has_json_ld
   );
-  const blockCount = asNumber(firstDefined(tech.json_ld_block_count, tech.jsonLdBlockCount, page.json_ld_block_count, page.schema_block_count));
+  const explicitBlockCount = firstDefined(tech.json_ld_block_count, tech.jsonLdBlockCount, page.json_ld_block_count, page.schema_block_count);
+  const blockCount = asNumber(explicitBlockCount);
+  const jsonLdPresent = explicitJsonLd !== undefined && explicitJsonLd !== null
+    ? bool(explicitJsonLd)
+    : explicitBlockCount !== undefined && explicitBlockCount !== null
+      ? blockCount > 0
+      : schemaTypes.length
+        ? true
+        : undefined;
   return {
-    jsonLdPresent: bool(explicitJsonLd) || blockCount > 0 || schemaTypes.length > 0,
+    jsonLdPresent,
     schemaTypes,
     robotsMeta: asString(firstDefined(tech.robots_meta, tech.robotsMeta, page.robots_meta, metadata.robots)),
     canonicalUrl: asString(firstDefined(tech.canonical_url, tech.canonicalUrl, page.canonical_url, page.final_url, page.resolved_url)),
@@ -406,14 +414,70 @@ function buildOwnedTechnicalIndex(source: AnyRecord): Map<string, OwnedPage['tec
 }
 
 function extractAiHygiene(source: AnyRecord): AiHygiene | undefined {
-  const hygiene = asRecord(firstDefined(source.ai_discoverability_hygiene, source.site_ai_hygiene, asRecord(source.executive).ai_discoverability_hygiene, asRecord(source.evidence_collection).site_ai_hygiene));
-  return Object.keys(hygiene).length ? hygiene as AiHygiene : undefined;
+  const executive = asRecord(source.executive);
+  const evidence = asRecord(source.evidence_collection);
+  const siteReadiness = asRecord(firstDefined(source.site_readiness, source.siteReadiness));
+  const hygiene = asRecord(firstDefined(
+    source.ai_discoverability_hygiene,
+    source.site_ai_hygiene,
+    source.ai_hygiene,
+    source.aiHygiene,
+    executive.ai_discoverability_hygiene,
+    executive.site_ai_hygiene,
+    executive.ai_hygiene,
+    evidence.ai_discoverability_hygiene,
+    evidence.site_ai_hygiene,
+    evidence.ai_hygiene,
+    siteReadiness.ai_discoverability_hygiene,
+    siteReadiness.site_ai_hygiene,
+    siteReadiness.ai_hygiene
+  ));
+  if (!Object.keys(hygiene).length) return undefined;
+
+  const robots = asRecord(firstDefined(hygiene.robots_txt, hygiene.robotsTxt, hygiene.robots));
+  const llms = asRecord(firstDefined(hygiene.llms_txt, hygiene.llmsTxt, hygiene.llms));
+  const structured = asRecord(firstDefined(hygiene.structured_data, hygiene.structuredData, hygiene.schema_coverage, hygiene.json_ld_schema_coverage));
+  const schemaTypesRaw = firstDefined(structured.schema_types_detected, structured.schemaTypesDetected, structured.schema_types, structured.schemaTypes);
+  const missingRaw = firstDefined(structured.pages_missing_json_ld, structured.pagesMissingJsonLd, structured.missing_pages, structured.pages_missing_schema);
+
+  return {
+    priority: asString(firstDefined(hygiene.priority, hygiene.severity)),
+    summary: asString(firstDefined(hygiene.summary, hygiene.notes, hygiene.message)),
+    robots_txt: {
+      status: asString(firstDefined(robots.status, robots.state, robots.result)),
+      url: asString(firstDefined(robots.url, robots.robots_url, robots.robotsUrl)),
+      sitemap_entries_count: asNumber(firstDefined(robots.sitemap_entries_count, robots.sitemapEntriesCount, robots.sitemap_count), undefined as unknown as number)
+    },
+    llms_txt: {
+      status: asString(firstDefined(llms.status, llms.state, llms.result)),
+      url: asString(firstDefined(llms.url, llms.llms_url, llms.llmsUrl)),
+      chars: asNumber(firstDefined(llms.chars, llms.character_count, llms.charCount), undefined as unknown as number)
+    },
+    structured_data: {
+      owned_pages_total: asNumber(firstDefined(structured.owned_pages_total, structured.ownedPagesTotal, structured.total_pages, structured.totalPages), undefined as unknown as number),
+      pages_with_schema: asNumber(firstDefined(structured.pages_with_schema, structured.pagesWithSchema, structured.pages_with_structured_data), undefined as unknown as number),
+      pages_with_json_ld: asNumber(firstDefined(structured.pages_with_json_ld, structured.pagesWithJsonLd, structured.json_ld_pages), undefined as unknown as number),
+      coverage_pct: asNumber(firstDefined(structured.coverage_pct, structured.coveragePct, structured.coverage_percent, structured.coveragePercent), undefined as unknown as number),
+      schema_types_detected: asArray<[string, number]>(schemaTypesRaw),
+      pages_missing_json_ld: asArray<AnyRecord>(missingRaw).map((item) => ({ url: asString(item.url), title: asString(item.title) }))
+    }
+  };
 }
 
 function deriveAiHygieneFromOwnedPages(ownedPages: OwnedPage[], fallback?: AiHygiene): AiHygiene | undefined {
   if (fallback) return fallback;
   if (!ownedPages.length) return undefined;
   const total = ownedPages.length;
+  const hasStructuredEvidence = ownedPages.some((p) => p.technicalSignals?.jsonLdPresent !== undefined || Boolean(p.technicalSignals?.schemaTypes?.length));
+  if (!hasStructuredEvidence) {
+    return {
+      priority: 'not checked',
+      robots_txt: { status: 'not supplied' },
+      llms_txt: { status: 'not supplied' },
+      structured_data: { owned_pages_total: total },
+      summary: `AI discoverability hygiene was not supplied in this report bundle. JSON-LD/schema coverage is not checked for ${total} owned pages.`
+    };
+  }
   const pagesWithJsonLd = ownedPages.filter((p) => Boolean(p.technicalSignals?.jsonLdPresent)).length;
   const coverage = total ? Math.round((pagesWithJsonLd / total) * 1000) / 10 : 0;
   const missing = ownedPages.filter((p) => !p.technicalSignals?.jsonLdPresent).slice(0, 20).map((p) => ({ url: p.url, title: p.title }));
@@ -439,6 +503,15 @@ function deriveAiHygieneFromOwnedPages(ownedPages: OwnedPage[], fallback?: AiHyg
     },
     summary: `JSON-LD/schema coverage: ${pagesWithJsonLd}/${total} owned pages (${coverage}%). Robots.txt and LLMs.txt were not supplied in this report bundle.`
   };
+}
+
+function aiHygieneWarnings(explicit: AiHygiene | undefined, derived: AiHygiene | undefined): string[] {
+  if (explicit) return [];
+  if (!derived) return ['AI discoverability hygiene payload was not supplied in the report contract.'];
+  if (derived.priority === 'not checked') {
+    return ['AI discoverability hygiene payload was not supplied; structured data coverage is marked not checked rather than inferred from GEO structure scores.'];
+  }
+  return ['AI discoverability hygiene payload was not supplied; JSON-LD/schema coverage was derived from explicit owned-page crawl signals only.'];
 }
 
 function mapOwnedPages(cmsPayload: AnyRecord): OwnedPage[] {
@@ -639,6 +712,9 @@ function mapFrontendPreviewBundle(source: AnyRecord): ReportBundle | null {
   if (!cmsModules.length) warnings.push('Preview bundle did not include cms_ready_content_modules.');
   if (!actionChecklist.length) warnings.push('Preview bundle did not include full action_checklist items.');
   if (typeof source.executive_report === 'string' && !Object.keys(executiveReport).length) warnings.push('Executive report was embedded as text but could not be parsed as JSON.');
+  const explicitAiHygiene = extractAiHygiene(source);
+  const aiHygiene = deriveAiHygieneFromOwnedPages(ownedPages, explicitAiHygiene);
+  warnings.push(...aiHygieneWarnings(explicitAiHygiene, aiHygiene));
 
   const brand = asString(firstDefined(metadata.brand, source.brand, executiveReport.brand), 'Unknown brand');
   const market = asString(firstDefined(metadata.market, source.market, executiveReport.market), 'Unknown market');
@@ -691,7 +767,7 @@ function mapFrontendPreviewBundle(source: AnyRecord): ReportBundle | null {
     cmsModules,
     prOpportunities,
     actionChecklist,
-    aiHygiene: deriveAiHygieneFromOwnedPages(ownedPages, extractAiHygiene(source)),
+    aiHygiene,
     parserMeta: {
       source: 'bodhi-output',
       parsedAt: new Date().toISOString(),
@@ -930,6 +1006,9 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
   const competitorLedQueries = asNumber(firstDefined(headline.competitor_led_query_count, kpis.competitor_led_query_count));
   const externalLedQueries = asNumber(firstDefined(headline.external_led_query_count, kpis.external_led_query_count));
   const brandScore = asNumber(firstDefined(headline.ai_visibility_score, headline.average_ai_visibility_score, kpis.ai_visibility_score));
+  const ownedPages = Array.from(ownedMap.values());
+  const explicitAiHygiene = extractAiHygiene(source);
+  const aiHygiene = deriveAiHygieneFromOwnedPages(ownedPages, explicitAiHygiene);
   return {
     runId: asString(source.run_id, 'uploaded_query_workbench'),
     brand,
@@ -971,10 +1050,10 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
         : deriveObservedDomains(derivedExternalSources)),
       winningSourcePatterns: asArray<AnyRecord>(sourceLandscape.winning_source_patterns).map((item) => ({ sourceType: asString(firstDefined(item.sourceType, item.source_type)), citationCount: asNumber(firstDefined(item.citationCount, item.citation_count)), winningPattern: asString(firstDefined(item.winningPattern, item.winning_pattern)) }))
     },
-    trend: [], queries, ownedPages: Array.from(ownedMap.values()), cmsModules, prOpportunities, actionChecklist, queryWorkbench: queryWorkbench as any,
-    aiHygiene: deriveAiHygieneFromOwnedPages(Array.from(ownedMap.values()), extractAiHygiene(source)),
+    trend: [], queries, ownedPages, cmsModules, prOpportunities, actionChecklist, queryWorkbench: queryWorkbench as any,
+    aiHygiene,
     methodology: asRecord(source.methodology),
-    parserMeta: { source: 'canonical-report', parsedAt: new Date().toISOString(), queryCount: queries.length, ownedPageCount: ownedMap.size, cmsModuleCount: cmsModules.length, prOpportunityCount: prOpportunities.length, actionCount: actionChecklist.length, warnings: [] }
+    parserMeta: { source: 'canonical-report', parsedAt: new Date().toISOString(), queryCount: queries.length, ownedPageCount: ownedMap.size, cmsModuleCount: cmsModules.length, prOpportunityCount: prOpportunities.length, actionCount: actionChecklist.length, warnings: aiHygieneWarnings(explicitAiHygiene, aiHygiene) }
   };
 }
 
@@ -1039,6 +1118,9 @@ export function normaliseReport(raw: unknown): ReportBundle {
   if (actionMeta.item_count && actionChecklist.length !== asNumber(actionMeta.item_count)) {
     warnings.push(`Action checklist payload was not embedded; dashboard is showing ${actionChecklist.length} actions derived from CMS/PR outputs while Bodhi reported ${actionMeta.item_count} checklist items.`);
   }
+  const explicitAiHygiene = extractAiHygiene(root);
+  const aiHygiene = deriveAiHygieneFromOwnedPages(ownedPages, explicitAiHygiene);
+  warnings.push(...aiHygieneWarnings(explicitAiHygiene, aiHygiene));
 
   if (!queries.length && !ownedPages.length && !cmsModules.length && !prOpportunities.length) {
     throw new Error('This JSON does not contain a recognised Bodhi dashboard, query evidence, owned page, CMS, or PR payload.');
@@ -1100,7 +1182,7 @@ export function normaliseReport(raw: unknown): ReportBundle {
     cmsModules,
     prOpportunities,
     actionChecklist,
-    aiHygiene: deriveAiHygieneFromOwnedPages(ownedPages, extractAiHygiene(root)),
+    aiHygiene,
     parserMeta: {
       source: 'bodhi-output',
       parsedAt: new Date().toISOString(),
