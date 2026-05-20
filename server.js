@@ -76,13 +76,15 @@ function parseMaybeJson(value) {
 function unwrapApiPayload(payload) {
   let current = parseMaybeJson(payload);
 
-  // Bodhi file API returns { data: "<file content>" }. That data may itself be JSON text.
-  if (current && typeof current === 'object' && !Array.isArray(current) && Object.prototype.hasOwnProperty.call(current, 'data')) {
-    const maybeData = current.data;
-    if (typeof maybeData === 'string' || (maybeData && typeof maybeData === 'object')) {
-      const parsedData = parseMaybeJson(maybeData);
-      if (parsedData && parsedData !== maybeData) return unwrapApiPayload(parsedData);
-      if (typeof maybeData === 'object') return maybeData;
+  if (current && typeof current === 'object' && !Array.isArray(current)) {
+    const reportKeys = ['frontend_report_bundle', 'report_bundle', 'bundle', 'report', 'payload', 'data'];
+    for (const key of reportKeys) {
+      if (!Object.prototype.hasOwnProperty.call(current, key)) continue;
+      const maybeValue = current[key];
+      if (typeof maybeValue !== 'string' && (!maybeValue || typeof maybeValue !== 'object')) continue;
+      const parsedValue = parseMaybeJson(maybeValue);
+      if (parsedValue && parsedValue !== maybeValue) return unwrapApiPayload(parsedValue);
+      if (typeof maybeValue === 'object') return unwrapApiPayload(maybeValue);
     }
   }
 
@@ -109,6 +111,7 @@ function isUsefulReportPayload(payload) {
   if (!value || typeof value !== 'object') return false;
   if (value.schema_version === 'query_workbench.v1') return true;
   if (value.contract_version === 'page_level_cms_grouped_pr.v1') return true;
+  if (value.contract_version === 'page_level_cms_grouped_pr.v2') return true;
   if (value.frontend_report_bundle) return true;
   if (value['Preview Node']) return true;
   if (Array.isArray(value.query_workbench)) return true;
@@ -138,6 +141,24 @@ async function tryUrls(urls, headers, label) {
     try {
       const payload = await fetchAny(url, headers);
       return { payload, sourceUrl: url, errors };
+    } catch (error) {
+      errors.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return { payload: null, sourceUrl: '', errors };
+}
+
+async function tryReportUrls(urls, headers, label) {
+  const errors = [];
+  for (const url of urls) {
+    try {
+      const payload = await fetchAny(url, headers);
+      const unwrapped = unwrapApiPayload(payload);
+      if (isUsefulReportPayload(unwrapped)) return { payload: unwrapped, sourceUrl: url, errors };
+      const keys = unwrapped && typeof unwrapped === 'object' && !Array.isArray(unwrapped)
+        ? Object.keys(unwrapped).slice(0, 8).join(', ')
+        : typeof unwrapped;
+      errors.push(`${label}: ${url} returned JSON but not a recognised report bundle${keys ? ` (keys: ${keys})` : ''}.`);
     } catch (error) {
       errors.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -256,15 +277,20 @@ function candidateEvidenceUrls(req) {
 
   const brand = String(req.query.brand || process.env.DEFAULT_BRAND || 'Nissan');
   const market = String(req.query.market || process.env.DEFAULT_MARKET || 'Japan');
-  const runId = env('EVIDENCE_RUN_ID', 'BODHI_EVIDENCE_RUN_ID', 'VITE_EVIDENCE_RUN_ID');
-  const params = new URLSearchParams({ brand, market }).toString();
+  const domain = String(req.query.domain || process.env.DEFAULT_DOMAIN || '');
+  const explicitRunId = String(req.query.runId || req.query.run_id || '').trim();
+  const paramsObj = domain ? { brand, market, domain } : { brand, market };
+  const params = new URLSearchParams(paramsObj).toString();
   const urls = [];
-  if (runId) {
-    urls.push(`${base}/runs/${encodeURIComponent(runId)}/report-bundle`);
-    urls.push(`${base}/runs/${encodeURIComponent(runId)}/bodhi-compact`);
-    urls.push(`${base}/runs/${encodeURIComponent(runId)}/compact`);
-  }
+  // Load latest must mean "latest successful report" for the selected
+  // brand/market. Do not let stale Railway env vars such as EVIDENCE_RUN_ID pin
+  // the dashboard to an old or in-progress run. Explicit runId query params are
+  // still supported for diagnostics.
+  urls.push(`${base}/reports/latest-successful?${params}`);
   urls.push(`${base}/runs/latest/report-bundle?${params}`);
+  if (explicitRunId) {
+    urls.push(`${base}/runs/${encodeURIComponent(explicitRunId)}/report-bundle`);
+  }
   urls.push(`${base}/runs/latest/bodhi-compact?${params}`);
   urls.push(`${base}/runs/latest/compact?${params}`);
   urls.push(`${base}/runs/latest?${params}`);
@@ -337,7 +363,7 @@ app.get('/api/bodhi/latest', async (req, res) => {
 
   const evidenceUrls = candidateEvidenceUrls(req);
   if (evidenceUrls.length) {
-    const evidence = await tryUrls(evidenceUrls, plainHeaders(), 'Evidence service');
+    const evidence = await tryReportUrls(evidenceUrls, plainHeaders(), 'Evidence service');
     allErrors.push(...evidence.errors);
     if (evidence.payload) {
       res.setHeader('X-Report-Source', 'evidence-service');

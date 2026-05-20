@@ -43,6 +43,26 @@ function parseMaybeJson(value: unknown): unknown {
   return value;
 }
 
+function unwrapReportEnvelope(raw: unknown, depth = 0): AnyRecord {
+  const root = asRecord(parseMaybeJson(raw));
+  if (!Object.keys(root).length || depth > 4) return root;
+  if (
+    root.schema_version === 'query_workbench.v1' ||
+    String(root.contract_version || '').startsWith('page_level_cms_grouped_pr.') ||
+    Array.isArray(root.query_workbench) ||
+    root['Preview Node'] ||
+    (root.executive && root.visibility && Array.isArray(root.queries))
+  ) {
+    return root;
+  }
+  for (const key of ['frontend_report_bundle', 'report_bundle', 'bundle', 'report', 'payload', 'data']) {
+    if (!(key in root)) continue;
+    const child = asRecord(parseMaybeJson(root[key]));
+    if (Object.keys(child).length) return unwrapReportEnvelope(child, depth + 1);
+  }
+  return root;
+}
+
 function unwrapRun(raw: unknown): AnyRecord {
   const root = asRecord(parseMaybeJson(raw));
   const keys = Object.keys(root);
@@ -1126,7 +1146,7 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
 }
 
 export function normaliseReport(raw: unknown): ReportBundle {
-  const root = asRecord(parseMaybeJson(raw));
+  const root = unwrapReportEnvelope(raw);
   const frontendRoot = mapFrontendPreviewBundle(root);
   if (frontendRoot) return withExecutiveScorecard(frontendRoot);
 
