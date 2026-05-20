@@ -335,15 +335,6 @@ app.get('/api/bodhi/status', (_req, res) => {
 app.get('/api/bodhi/latest', async (req, res) => {
   const allErrors = [];
 
-  const bodhi = await fetchBodhiLatest();
-  allErrors.push(...bodhi.errors);
-  if (bodhi.payload) {
-    res.setHeader('X-Report-Source', 'bodhi');
-    res.setHeader('X-Report-Source-Url', bodhi.sourceUrl);
-    res.json(bodhi.payload);
-    return;
-  }
-
   const evidenceUrls = candidateEvidenceUrls(req);
   if (evidenceUrls.length) {
     const evidence = await tryUrls(evidenceUrls, plainHeaders(), 'Evidence service');
@@ -356,8 +347,17 @@ app.get('/api/bodhi/latest', async (req, res) => {
     }
   }
 
+  const bodhi = await fetchBodhiLatest();
+  allErrors.push(...bodhi.errors);
+  if (bodhi.payload) {
+    res.setHeader('X-Report-Source', 'bodhi');
+    res.setHeader('X-Report-Source-Url', bodhi.sourceUrl);
+    res.json(bodhi.payload);
+    return;
+  }
+
   res.status(502).json({
-    error: 'Unable to fetch latest report from Bodhi. Manual JSON upload is still available as a fallback.',
+    error: 'Unable to fetch latest successful evidence report. Manual JSON upload is still available as a fallback.',
     expectedBodhiEnv: ['BODHI_API_BASE_URL=https://psaisuite.com/save', 'BODHI_PAT_TOKEN with tasks:read scope', 'BODHI_TASK_ID', 'BODHI_RUN_ID optional', 'BODHI_OUTPUT_FILE optional'],
     errors: allErrors.slice(-12)
   });

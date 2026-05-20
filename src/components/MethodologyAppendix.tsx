@@ -1,4 +1,3 @@
-import type { ReportBundle } from '../types/report';
 import { Card, SectionTitle } from './ui';
 
 const sections = [
@@ -68,20 +67,9 @@ const sections = [
   }
 ];
 
-export function MethodologyAppendix({ report }: { report: ReportBundle }) {
+export function MethodologyAppendix() {
   return (
     <div className="space-y-5">
-      <Card>
-        <SectionTitle eyebrow="Documentation" title="Methodology and product guide">
-          Detailed operating guidance for interpreting the report, scoring logic, evidence flow and recommendation outputs for executive and operator users.
-        </SectionTitle>
-        <div className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-4">
-          <DocMetric label="Current report" value={`${report.brand} · ${report.market}`} />
-          <DocMetric label="Run ID" value={report.runId || 'not supplied'} mono />
-          <DocMetric label="Queries" value={String(report.queries.length)} />
-          <DocMetric label="Owned pages" value={String(report.ownedPages.length)} />
-        </div>
-      </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         {sections.map((section) => (
           <Card key={section.title}>
@@ -99,8 +87,4 @@ export function MethodologyAppendix({ report }: { report: ReportBundle }) {
       </div>
     </div>
   );
-}
-
-function DocMetric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs uppercase tracking-wide text-slate-500">{label}</p><p className={`mt-1 font-semibold text-slate-900 ${mono ? 'font-mono text-xs break-all' : ''}`}>{value}</p></div>;
 }

@@ -33,7 +33,7 @@ export function RunHistory({ brand, market, onLoad }: { brand: string; market: s
       {error && <p className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="px-3 py-3">Run</th><th className="px-3 py-3">Queries</th><th className="px-3 py-3">Citations</th><th className="px-3 py-3">Owned scored</th><th className="px-3 py-3">Mapped owned</th><th className="px-3 py-3">External</th><th className="px-3 py-3">Crawl</th><th className="px-3 py-3">Mode</th><th className="px-3 py-3">Action</th></tr></thead>
+          <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-500"><th className="px-3 py-3">Run</th><th className="px-3 py-3">Queries</th><th className="px-3 py-3">Citations</th><th className="px-3 py-3">Owned scored</th><th className="px-3 py-3">External</th><th className="px-3 py-3">Crawl</th><th className="px-3 py-3">Mode</th><th className="px-3 py-3">Action</th></tr></thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row) => (
               <tr key={row.run_id} className="align-top">
@@ -41,7 +41,6 @@ export function RunHistory({ brand, market, onLoad }: { brand: string; market: s
                 <td className="px-3 py-4">{row.query_count ?? '—'}</td>
                 <td className="px-3 py-4">{row.citation_count ?? '—'}</td>
                 <td className="px-3 py-4">{row.owned_pages_scoreable ?? row.owned_inventory_selected ?? '—'}</td>
-                <td className="px-3 py-4">{row.owned_query_mapped_unique ?? '—'}</td>
                 <td className="px-3 py-4">{row.external_pages_scoreable ?? '—'}</td>
                 <td className="px-3 py-4">{row.crawl_success_rate != null ? `${Math.round(Number(row.crawl_success_rate) * 100)}%` : '—'}</td>
                 <td className="px-3 py-4 text-xs text-slate-600">{row.serpapi_enabled ? 'Fresh SerpAPI' : row.source_run_id ? 'Citation reuse' : 'No AI refresh'}</td>

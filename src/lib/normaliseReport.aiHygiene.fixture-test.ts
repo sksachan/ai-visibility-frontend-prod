@@ -127,6 +127,7 @@ const hygieneAugmented = normaliseReport(canonicalBundle({
     ]
   }]
 }));
-assert(hygieneAugmented.ownedPages.length === 8, 'hygiene missing-page list should augment owned URL rows to the audited total');
+assert(hygieneAugmented.ownedPages.length === 4, 'hygiene missing-page list should not synthesize zero-score owned URL rows');
 assert(hygieneAugmented.ownedPages.find((page) => page.url.endsWith('/with-jsonld.html'))?.technicalSignals?.jsonLdPresent === true, 'non-missing page should be marked JSON-LD present when hygiene says 1/8 and seven URLs are missing');
-assert(hygieneAugmented.ownedPages.find((page) => page.url.endsWith('/missing-7.html'))?.technicalSignals?.jsonLdPresent === false, 'hygiene-only missing pages should be represented as JSON-LD missing');
+assert(hygieneAugmented.ownedPages.find((page) => page.url.endsWith('/missing-3.html'))?.technicalSignals?.jsonLdPresent === false, 'supplied missing pages with readiness rows should be marked JSON-LD missing');
+assert(!hygieneAugmented.ownedPages.some((page) => page.url.endsWith('/missing-7.html')), 'hygiene-only missing pages should stay out of scored owned URL rows');

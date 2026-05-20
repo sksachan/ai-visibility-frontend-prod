@@ -106,7 +106,9 @@ function mapCitation(item: AnyRecord): CitationExample {
     domain: asString(firstDefined(item.domain, item.source_domain), ''),
     sourceType: asString(firstDefined(item.source_type, item.sourceType), 'unknown'),
     citationPosition: asNumber(firstDefined(item.citation_position, item.position), undefined as unknown as number),
-    snippet: asString(firstDefined(item.snippet, item.text, item.summary), ''),
+    snippet: asString(firstDefined(item.snippet, item.citation_text, item.text, item.summary), ''),
+    queryId: asString(firstDefined(item.query_id, item.queryId)),
+    query: asString(item.query),
     isCompetitor: bool(item.is_competitor),
     isOwnedTargetPage: bool(item.is_owned_target_page)
   };
@@ -542,33 +544,6 @@ function withAiHygieneOwnedPages(ownedPages: OwnedPage[], hygiene?: AiHygiene): 
     });
   });
 
-  missing.forEach((item) => {
-    const key = urlKey(item.url);
-    if (!key || byUrl.has(key)) return;
-    const url = asString(item.url);
-    byUrl.set(key, {
-      url,
-      title: asString(item.title),
-      journeyCategory: 'Inventory',
-      evidenceMatchStatus: 'No GEO readiness row supplied',
-      mappedQuery: 'Inventory-only hygiene audit page',
-      relatedQueries: [],
-      geoScore: 0,
-      clarity: 0,
-      semanticDepth: 0,
-      evidence: 0,
-      structure: 0,
-      freshness: 0,
-      authority: 0,
-      faqReadiness: 0,
-      diagnostics: ['JSON-LD missing in hygiene audit; GEO readiness row was not supplied in this report bundle.'],
-      recommendedHtmlChanges: [],
-      queryMapped: false,
-      inventorySource: 'ai_hygiene',
-      technicalSignals: { jsonLdPresent: false, schemaTypes: [] }
-    });
-  });
-
   return Array.from(byUrl.values());
 }
 
@@ -857,9 +832,12 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
     ? asArray<AnyRecord>(rawSourceTypeCounts).map((item) => ({ sourceType: asString(firstDefined(item.sourceType, item.source_type)), count: asNumber(item.count) }))
     : mapSourceTypeCounts(asRecord(rawSourceTypeCounts));
   const derivedExternalSources: AnyRecord[] = [];
+  const sourceCitationEvidence: CitationExample[] = [];
   queryWorkbench.forEach((row) => {
     const q = asString(row.query);
+    const qid = asString(row.query_id);
     [...asArray<AnyRecord>(row.external_top3_benchmark), ...asArray<AnyRecord>(asRecord(row.current_ai_visibility).top_citations)].forEach((sourceItem) => {
+      sourceCitationEvidence.push(mapCitation({ ...sourceItem, query: q, query_id: qid }));
       if (bool(sourceItem.is_owned_domain) || bool(sourceItem.is_owned_target_page)) return;
       derivedExternalSources.push({ ...sourceItem, query: q });
     });
@@ -938,9 +916,31 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
         faqReadiness: asNumber(dims.faq_readiness),
         diagnostics: asArray<string>(item.geo_gaps),
         recommendedHtmlChanges: asArray<string>(item.recommended_update_focus),
+        queryMapped: true,
+        inventorySource: asString(firstDefined(item.inventory_source, item.inventorySource), 'query_mapped'),
         technicalSignals: tech
       });
     });
+  });
+  const explicitOwnedRows = mapOwnedPages({
+    pages: firstDefined(
+      source.owned_url_readiness,
+      source.owned_readiness,
+      source.owned_pages,
+      asRecord(source.owned_pages_full).pages
+    )
+  });
+  explicitOwnedRows.forEach((page) => {
+    const key = urlKey(page.url);
+    if (!key) return;
+    const existing = Array.from(ownedMap.values()).find((candidate) => urlKey(candidate.url) === key);
+    if (existing) {
+      existing.queryMapped = existing.queryMapped || page.queryMapped;
+      existing.inventorySource = existing.inventorySource || page.inventorySource;
+      existing.technicalSignals = { ...page.technicalSignals, ...existing.technicalSignals };
+      return;
+    }
+    ownedMap.set(page.url, page);
   });
   const linkedIds = (value: unknown): string[] => asArray<AnyRecord>(value).map((q) => asString(firstDefined(q.query_id, q.id))).filter(Boolean);
   const cleanGeneric = (value: unknown): string => {
@@ -1054,6 +1054,13 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
     };
   };
   const cmsModules = asArray<AnyRecord>(firstDefined(source.page_level_cms_recommendations, source.cms_recommendations)).map(mapCms);
+  const cmsTargetKeys = new Set(cmsModules.map((item) => urlKey(item.targetUrl)).filter(Boolean));
+  ownedMap.forEach((page) => {
+    if (cmsTargetKeys.has(urlKey(page.url))) {
+      page.queryMapped = true;
+      page.inventorySource = page.inventorySource || 'cms_recommendation';
+    }
+  });
   const prOpportunities = asArray<AnyRecord>(firstDefined(source.grouped_pr_opportunities, source.pr_opportunities)).map(mapGroupedPr);
   const actionChecklist = asArray<AnyRecord>(source.action_checklist).map((item) => ({
     action: asString(item.action), owner: asString(item.owner), priority: priority(item.priority), effort: effort(item.effort), status: status(item.status), dependency: asString(firstDefined(item.dependency, item.target_url, item.source_type)), source: asString(item.source), target: asString(firstDefined(item.target, item.target_url, item.source_type)), workstream: asString(item.workstream), category: asString(firstDefined(item.category, item.module_type)), targetSourceTypes: asArray<string>(item.target_source_types), valueScore: asNumber(item.value_score), queryCoverageCount: asNumber(item.query_coverage_count), linkedQueryIds: asArray<string>(item.linked_query_ids), moduleType: asString(item.module_type)
@@ -1108,7 +1115,8 @@ function mapCanonicalReport(source: AnyRecord): ReportBundle | null {
             exampleQuery: asString(firstDefined(item.example_query, item.exampleQuery))
           }))
         : deriveObservedDomains(derivedExternalSources)),
-      winningSourcePatterns: asArray<AnyRecord>(sourceLandscape.winning_source_patterns).map((item) => ({ sourceType: asString(firstDefined(item.sourceType, item.source_type)), citationCount: asNumber(firstDefined(item.citationCount, item.citation_count)), winningPattern: asString(firstDefined(item.winningPattern, item.winning_pattern)) }))
+      winningSourcePatterns: asArray<AnyRecord>(sourceLandscape.winning_source_patterns).map((item) => ({ sourceType: asString(firstDefined(item.sourceType, item.source_type)), citationCount: asNumber(firstDefined(item.citationCount, item.citation_count)), winningPattern: asString(firstDefined(item.winningPattern, item.winning_pattern)) })),
+      sourceCitations: sourceCitationEvidence
     },
     trend: [], queries, ownedPages: ownedPagesWithHygiene, cmsModules, prOpportunities, actionChecklist, queryWorkbench: queryWorkbench as any,
     aiHygiene,

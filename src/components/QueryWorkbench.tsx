@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { QueryWorkbenchItem, ReportBundle } from '../types/report';
+import type { CitationExample, OwnedPage, QueryWorkbenchItem, ReportBundle } from '../types/report';
 import { Badge, Card, SectionTitle } from './ui';
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean))).sort();
@@ -14,6 +14,28 @@ function leadingDomain(row: QueryWorkbenchItem) {
   return (row.external_top3_benchmark ?? []).find((c) => c.domain)?.domain
     || (row.current_ai_visibility?.top_citations ?? []).find((c) => c.domain)?.domain
     || 'Not supplied';
+}
+
+function normaliseUrl(value: string | undefined) {
+  return String(value || '').trim().replace(/#.*$/, '').replace(/\/$/, '').toLowerCase();
+}
+
+function citationRows(row: QueryWorkbenchItem): CitationExample[] {
+  return row.winning_patterns?.length
+    ? []
+    : [...(row.external_top3_benchmark ?? []), ...(row.current_ai_visibility?.top_citations ?? [])];
+}
+
+type MappedOwnedUrl = NonNullable<QueryWorkbenchItem['mapped_owned_urls']>[number];
+
+function jsonLdStatus(item: MappedOwnedUrl, owned?: OwnedPage) {
+  const tech = owned?.technicalSignals;
+  const direct = item as Record<string, unknown>;
+  const present = tech?.jsonLdPresent ?? direct.json_ld_present ?? direct.jsonLdPresent;
+  const schemaTypes = tech?.schemaTypes ?? [];
+  if (present === undefined || present === null) return 'JSON-LD: not checked';
+  if (present === false) return 'JSON-LD: missing';
+  return schemaTypes.length <= 1 ? 'JSON-LD: partial' : 'JSON-LD: present';
 }
 
 export function QueryWorkbench({ report }: { report: ReportBundle }) {
@@ -87,7 +109,7 @@ export function QueryWorkbench({ report }: { report: ReportBundle }) {
         </select>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        {visible.map((row) => <WorkbenchCard key={row.query_id} row={row} />)}
+        {visible.map((row) => <WorkbenchCard key={row.query_id} row={row} ownedPages={report.ownedPages} />)}
       </div>
       {visibleCount < filtered.length ? (
         <div className="mt-5 flex justify-center">
@@ -98,11 +120,14 @@ export function QueryWorkbench({ report }: { report: ReportBundle }) {
   );
 }
 
-function WorkbenchCard({ row }: { row: QueryWorkbenchItem }) {
+function WorkbenchCard({ row, ownedPages }: { row: QueryWorkbenchItem; ownedPages: OwnedPage[] }) {
   const vis = row.current_ai_visibility ?? {};
   const mapped = row.mapped_owned_urls ?? [];
-  const competitors = (vis.competitors ?? []).join(', ') || 'None flagged';
+  const competitors = (vis.competitors ?? []).join(', ');
   const types = sourceTypes(row).map(label).join(', ') || 'Not supplied';
+  const ownedByUrl = new Map(ownedPages.map((page) => [normaliseUrl(page.url), page]));
+  const fallbackCitations = citationRows(row);
+  const showCompetitors = competitors || (vis.competitor_citation_count ?? 0) > 0 || String(vis.status || '').includes('competitor');
   return (
     <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -116,20 +141,25 @@ function WorkbenchCard({ row }: { row: QueryWorkbenchItem }) {
         </div>
       </div>
       <div className="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
-        <Metric label="Competitors" value={competitors} />
+        {showCompetitors && <Metric label="Competitors" value={competitors || `${vis.competitor_citation_count ?? 0} competitor citations`} />}
         <Metric label="Winning source types" value={types} />
         <Metric label="Leading citation domain" value={leadingDomain(row)} />
       </div>
       <details className="mt-4 rounded-xl bg-white p-3">
         <summary className="cursor-pointer font-semibold text-slate-900">Top mapped owned URLs ({mapped.length})</summary>
         <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-slate-700">
-          {mapped.map((item) => <li key={item.url}><span className="font-semibold text-slate-950">{item.title || item.url}</span><br /><span className="break-all text-xs text-slate-500">{item.url}</span><br />GEO: {item.current_geo_score_120 ?? 0}/120 · gaps: {(item.geo_gaps ?? []).join(', ') || 'none'}</li>)}
+          {mapped.map((item) => {
+            const owned = ownedByUrl.get(normaliseUrl(item.url));
+            return <li key={item.url}><span className="font-semibold text-slate-950">{item.title || item.url}</span><br /><span className="break-all text-xs text-slate-500">{item.url}</span><br />GEO: {item.current_geo_score_120 ?? owned?.geoScore ?? 0}/120 · {jsonLdStatus(item, owned)}</li>;
+          })}
         </ol>
       </details>
       <details className="mt-3 rounded-xl bg-white p-3">
-        <summary className="cursor-pointer font-semibold text-slate-900">Winning patterns ({row.winning_patterns?.length ?? 0})</summary>
+        <summary className="cursor-pointer font-semibold text-slate-900">Winning patterns ({row.winning_patterns?.length ?? fallbackCitations.length})</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-          {(row.winning_patterns ?? []).map((pattern, idx) => <li key={`${pattern.source_url}-${idx}`}><span className="font-semibold">{label(pattern.pattern_type || '')}</span>{pattern.evidence_basis ? ` — ${pattern.evidence_basis}` : ''}</li>)}
+          {(row.winning_patterns ?? []).map((pattern, idx) => <li key={`${pattern.source_url}-${idx}`}><span className="font-semibold">{label(pattern.pattern_type || '')}</span>{pattern.source_domain ? ` · ${pattern.source_domain}` : ''}{pattern.evidence_basis ? ` - ${pattern.evidence_basis}` : ''}</li>)}
+          {!row.winning_patterns?.length && fallbackCitations.map((citation, idx) => <li key={`${citation.url}-${idx}`}><span className="font-semibold">{citation.domain || citation.url || 'Citation source'}</span>{citation.sourceType ? ` · ${label(citation.sourceType)}` : ''}{citation.snippet ? ` - ${citation.snippet}` : ''}</li>)}
+          {!row.winning_patterns?.length && !fallbackCitations.length ? <li>No citation evidence supplied for this query.</li> : null}
         </ul>
       </details>
     </article>

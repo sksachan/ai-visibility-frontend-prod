@@ -96,7 +96,8 @@ function addQuery(cursor: PdfCursor, query: QueryDiagnostic, index: number) {
 
 function addOwnedPage(cursor: PdfCursor, page: OwnedPage, index: number) {
   addText(cursor, `${index + 1}. ${page.url}`, { bold: true, size: 9.5, gap: 1 });
-  addText(cursor, `GEO score: ${page.geoScore}/120 | Journey: ${page.journeyCategory || 'Unclassified'} | Linked queries: ${page.relatedQueries?.length ?? 0}`, { size: 8.8, color: [71, 85, 105], gap: 1 });
+  const jsonLd = page.technicalSignals?.jsonLdPresent === undefined ? 'not checked' : page.technicalSignals.jsonLdPresent ? 'present' : 'missing';
+  addText(cursor, `GEO score: ${page.geoScore}/120 | Journey: ${page.journeyCategory || 'Unclassified'} | Linked queries: ${page.relatedQueries?.length ?? 0} | JSON-LD: ${jsonLd}`, { size: 8.8, color: [71, 85, 105], gap: 1 });
   if (page.title) addText(cursor, page.title, { size: 8.8, color: [71, 85, 105], gap: 1 });
   addBulletList(cursor, page.diagnostics || [], 3);
 }
@@ -157,7 +158,7 @@ export async function exportReportToPdf(report: ReportBundle, fileName: string) 
     { label: 'AI visibility score', value: `${report.executive.headlineMetrics.brandScore ?? report.visibility.brandScore} / 100` },
     { label: 'Queries audited', value: report.executive.headlineMetrics.queryCount ?? report.queries.length },
     { label: 'Avg owned GEO', value: `${report.executive.headlineMetrics.averageOwnedGeoScore120 ?? 0} / 120` },
-    { label: 'Owned pages audited', value: report.executive.headlineMetrics.ownedPageCount ?? report.ownedPages.length }
+    { label: 'Owned pages audited', value: report.ownedPages.length || report.executive.headlineMetrics.ownedPageCount || 0 }
   ]);
 
   addSection(cursor, 'Executive summary');
@@ -167,6 +168,18 @@ export async function exportReportToPdf(report: ReportBundle, fileName: string) 
   addBulletList(cursor, report.executive.whyNow || [], 6);
   addText(cursor, 'Priority actions', { bold: true, size: 11, gap: 2 });
   addBulletList(cursor, report.executive.priorityActions || [], 6);
+
+  if (report.aiHygiene) {
+    const structured = report.aiHygiene.structured_data;
+    addSection(cursor, 'AI discoverability hygiene');
+    addText(cursor, report.aiHygiene.summary || 'AI hygiene summary was not supplied.', { size: 9.5, gap: 2 });
+    addMetricRow(cursor, [
+      { label: 'Robots.txt', value: report.aiHygiene.robots_txt?.status || 'not supplied' },
+      { label: 'LLMs.txt', value: report.aiHygiene.llms_txt?.status || 'not supplied' },
+      { label: 'JSON-LD/schema coverage', value: `${structured?.pages_with_json_ld ?? 0}/${structured?.owned_pages_total ?? report.ownedPages.length}` },
+      { label: 'Priority', value: report.aiHygiene.priority || 'not supplied' }
+    ]);
+  }
 
   addSection(cursor, 'Query workbench highlights');
   report.queries.slice(0, 20).forEach((query, index) => addQuery(cursor, query, index));
@@ -179,9 +192,15 @@ export async function exportReportToPdf(report: ReportBundle, fileName: string) 
   } else {
     addText(cursor, 'No observed non-owned domains supplied.', { size: 9 });
   }
+  const citations = report.sourceLandscape?.sourceCitations || [];
+  if (citations.length) {
+    addText(cursor, 'Captured citation evidence', { bold: true, size: 11, gap: 2 });
+    citations.slice(0, 60).forEach((citation, index) => addText(cursor, `${index + 1}. ${citation.domain || citation.url} · ${citation.sourceType || 'unknown'} · ${citation.queryId || ''}${citation.snippet ? ` · ${citation.snippet}` : ''}`, { size: 8.5, color: [51, 65, 85], gap: 1 }));
+    if (citations.length > 60) addText(cursor, `Additional citation evidence rows in dashboard: ${citations.length - 60}`, { size: 8.5, color: [71, 85, 105], gap: 3 });
+  }
 
   addSection(cursor, 'Owned URL readiness');
-  report.ownedPages.slice(0, 31).forEach((page, index) => addOwnedPage(cursor, page, index));
+  report.ownedPages.forEach((page, index) => addOwnedPage(cursor, page, index));
 
   addSection(cursor, 'CMS page-level recommendations');
   report.cmsModules.slice(0, 60).forEach((rec, index) => addRecommendation(cursor, rec, index, 'CMS'));

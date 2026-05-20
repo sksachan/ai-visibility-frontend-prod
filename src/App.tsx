@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Download, History, RefreshCcw, Upload } from 'lucide-react';
+import { BookOpen, Download, History, Menu, RefreshCcw, Upload, X } from 'lucide-react';
 import { ExecutiveReport } from './components/ExecutiveReport';
 import { VisibilityMatrix } from './components/VisibilityMatrix';
 import { Trend } from './components/Trend';
@@ -41,6 +41,7 @@ export default function App() {
   const [notice, setNotice] = useState<Notice>(null);
   const [footerMessage, setFooterMessage] = useState('Dashboard will auto-load the latest successful Bodhi report when configured. Upload JSON remains available as a fallback.');
   const [refreshStatus, setRefreshStatus] = useState<RunStatusSummary | null>(null);
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const brand = import.meta.env.VITE_DEFAULT_BRAND || report.brand;
@@ -120,11 +121,31 @@ export default function App() {
       <ActionChecklist report={report} />
     </>
   );
+  const actionButtons = (
+    <>
+      <button onClick={() => { setActionMenuOpen(false); void loadLatest(false); }} className="inline-flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+        <RefreshCcw size={16} /> {loading ? 'Loading...' : 'Load latest'}
+      </button>
+      <button onClick={() => { setActionMenuOpen(false); setActiveTab('runs'); }} className="inline-flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+        <History size={16} /> Previous runs
+      </button>
+      <button onClick={() => { setActionMenuOpen(false); setActiveTab('appendix'); }} className="inline-flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+        <BookOpen size={16} /> Documentation
+      </button>
+      <button onClick={() => { setActionMenuOpen(false); fileRef.current?.click(); }} className="inline-flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+        <Upload size={16} /> Upload report JSON
+      </button>
+      <input ref={fileRef} className="hidden" type="file" accept="application/json,.json" onChange={(e) => void onUpload(e.target.files?.[0])} />
+      <button onClick={() => { setActionMenuOpen(false); void exportReportToPdf(report, fileName); }} className="inline-flex w-full items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
+        <Download size={16} /> Download PDF
+      </button>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-16">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 pb-16">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur no-print">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="mx-auto flex max-w-7xl items-start justify-between gap-4 px-4 py-4">
           <div className="min-w-[260px] flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">AI Brand Visibility</p>
             <h1 className="text-xl font-semibold text-slate-950">AEO/GEO Intelligence Dashboard</h1>
@@ -132,26 +153,18 @@ export default function App() {
               <p className="mt-1 text-xs font-semibold text-amber-700">Refresh evidence is running. Showing latest successful report until completion.</p>
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-start gap-2 xl:max-w-[760px] xl:justify-end">
-            <button onClick={() => void loadLatest(false)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-              <RefreshCcw size={16} /> {loading ? 'Loading...' : 'Load latest'}
-            </button>
-            <button onClick={() => setActiveTab('runs')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-              <History size={16} /> Previous runs
-            </button>
-            <button onClick={() => setActiveTab('appendix')} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-              <BookOpen size={16} /> Documentation
-            </button>
-            <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-              <Upload size={16} /> Upload report JSON
-            </button>
-            <input ref={fileRef} className="hidden" type="file" accept="application/json,.json" onChange={(e) => void onUpload(e.target.files?.[0])} />
-            <button onClick={() => void exportReportToPdf(report, fileName)} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
-              <Download size={16} /> Download PDF
-            </button>
-          </div>
+          <button onClick={() => setActionMenuOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" aria-expanded={actionMenuOpen} aria-controls="dashboard-action-menu">
+            {actionMenuOpen ? <X size={16} /> : <Menu size={16} />} Menu
+          </button>
         </div>
-        <nav className="hide-scrollbar mx-auto flex max-w-7xl flex-wrap gap-2 px-4 pb-3">
+        {actionMenuOpen && (
+          <div id="dashboard-action-menu" className="mx-auto max-w-7xl px-4 pb-3">
+            <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:max-w-sm sm:ml-auto">
+              {actionButtons}
+            </div>
+          </div>
+        )}
+        <nav className="hide-scrollbar mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3">
           {tabs.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold ${activeTab === tab.id ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700'}`}>
               {tab.label}
@@ -177,7 +190,7 @@ export default function App() {
         {activeTab === 'pr' && <PrRecommendations report={report} />}
         {activeTab === 'actions' && <ActionChecklist report={report} />}
         {activeTab === 'runs' && <RunHistory brand={brand} market={market} onLoad={(next, row) => { setReport(next); setActiveTab('executive'); setFooterMessage(parseMessage(next, `Loaded previous run ${row.run_id}`)); setNotice(null); }} />}
-        {activeTab === 'appendix' && <MethodologyAppendix report={report} />}
+        {activeTab === 'appendix' && <MethodologyAppendix />}
         {activeTab === 'refresh' && <RefreshPanel brand={report.brand} market={report.market} />}
       </main>
 

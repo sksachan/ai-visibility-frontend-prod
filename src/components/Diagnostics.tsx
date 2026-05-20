@@ -18,16 +18,18 @@ export function QueryDiagnostics() {
 export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle; onOpenCms?: (url: string) => void }) {
   const [search, setSearch] = useState('');
   const [journey, setJourney] = useState('All');
-  const [scope, setScope] = useState('All audited inventory URLs');
+  const [scope, setScope] = useState('All scored owned URLs');
   const [sort, setSort] = useState<SortState>({ key: 'geoScore', direction: 'asc' });
   const journeys = useMemo(() => unique(report.ownedPages.map((p) => p.journeyCategory)), [report.ownedPages]);
+  const cmsUrls = useMemo(() => new Set(report.cmsModules.map((item) => normaliseUrl(item.targetUrl)).filter(Boolean)), [report.cmsModules]);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const rows = report.ownedPages.filter((page) => {
       const matchesSearch = !term || [page.url, page.title, page.journeyCategory, ...page.relatedQueries.map((q) => q.query), ...page.diagnostics].join(' ').toLowerCase().includes(term);
       const matchesJourney = journey === 'All' || page.journeyCategory === journey;
-      const isQueryMapped = page.queryMapped === true;
-      const matchesScope = scope === 'All audited inventory URLs' || (scope === 'Mapped to current query portfolio' ? isQueryMapped : !isQueryMapped);
+      const hasCms = cmsUrls.has(normaliseUrl(page.url));
+      const isQueryMapped = page.queryMapped === true || hasCms;
+      const matchesScope = scope === 'All scored owned URLs' || (scope === 'Mapped/CMS URLs' ? isQueryMapped : !isQueryMapped);
       return matchesSearch && matchesJourney && matchesScope;
     });
     return [...rows].sort((a, b) => {
@@ -37,7 +39,7 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
       if (typeof av === 'string' || typeof bv === 'string') return String(av).localeCompare(String(bv)) * dir;
       return (Number(av) - Number(bv)) * dir;
     });
-  }, [report.ownedPages, search, journey, scope, sort]);
+  }, [report.ownedPages, cmsUrls, search, journey, scope, sort]);
 
   function toggle(key: SortKey) {
     setSort((current) => current.key === key ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' });
@@ -46,7 +48,7 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
   return (
     <Card>
       <SectionTitle eyebrow="Owned URL GEO readiness" title={`Owned-page readiness records (${filtered.length}/${report.ownedPages.length})`}>
-        Site-level readiness includes inventory URLs selected from sitemap/robots plus query-mapped pages. Use the scope filter to separate broad inventory readiness from pages mapped to the current query portfolio.
+        Site-level readiness includes inventory URLs selected from sitemap/robots plus query-mapped CMS pages. Use the scope filter to separate broad inventory readiness from pages with CMS copy.
       </SectionTitle>
       <Controls>
         <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Search URL, title, query, gap..." value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -54,12 +56,12 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
           <option>All</option>{journeys.map((item) => <option key={item}>{item}</option>)}
         </select>
         <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={scope} onChange={(event) => setScope(event.target.value)}>
-          <option>All audited inventory URLs</option>
-          <option>Mapped to current query portfolio</option>
+          <option>All scored owned URLs</option>
+          <option>Mapped/CMS URLs</option>
           <option>Inventory only</option>
         </select>
       </Controls>
-      <OwnedTable pages={filtered} sort={sort} onSort={toggle} onOpenCms={onOpenCms} />
+      <OwnedTable pages={filtered} cmsUrls={cmsUrls} sort={sort} onSort={toggle} onOpenCms={onOpenCms} />
       <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {filtered.slice(0, 12).map((page) => <OwnedPageCard key={`${page.url}-diag`} page={page} />)}
       </div>
@@ -67,12 +69,16 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
   );
 }
 
+function normaliseUrl(value: string | undefined) {
+  return String(value || '').trim().replace(/#.*$/, '').replace(/\/$/, '').toLowerCase();
+}
+
 function SortHeader({ label, sortKey, sort, onSort }: { label: string; sortKey: SortKey; sort: SortState; onSort: (key: SortKey) => void }) {
   const arrow = sort.key === sortKey ? (sort.direction === 'asc' ? '↑' : '↓') : '↕';
   return <button type="button" className="inline-flex items-center gap-1 font-semibold" onClick={() => onSort(sortKey)}>{label} <span>{arrow}</span></button>;
 }
 
-function OwnedTable({ pages, sort, onSort, onOpenCms }: { pages: OwnedPage[]; sort: SortState; onSort: (key: SortKey) => void; onOpenCms?: (url: string) => void }) {
+function OwnedTable({ pages, cmsUrls, sort, onSort, onOpenCms }: { pages: OwnedPage[]; cmsUrls: Set<string>; sort: SortState; onSort: (key: SortKey) => void; onOpenCms?: (url: string) => void }) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -94,11 +100,11 @@ function OwnedTable({ pages, sort, onSort, onOpenCms }: { pages: OwnedPage[]; so
         <tbody className="divide-y divide-slate-100">
           {pages.map((page) => (
             <tr key={page.url} className="align-top">
-              <td className="max-w-sm px-3 py-4 font-medium text-slate-950"><p className="break-all">{page.url}</p>{page.title && <p className="mt-1 text-xs text-slate-500">{page.title}</p>}<p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{page.queryMapped ? 'Query mapped' : 'Inventory only'} · {page.inventorySource || 'sitemap_inventory'}</p></td>
+              <td className="max-w-sm px-3 py-4 font-medium text-slate-950"><p className="break-all">{page.url}</p>{page.title && <p className="mt-1 text-xs text-slate-500">{page.title}</p>}<p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{page.queryMapped || cmsUrls.has(normaliseUrl(page.url)) ? 'Mapped/CMS' : 'Inventory only'} · {page.inventorySource || 'sitemap_inventory'}</p></td>
               <td className="max-w-xs px-3 py-4 text-slate-600">{page.journeyCategory}</td>
               <td className="px-3 py-4 font-semibold text-slate-950">{page.geoScore}</td><td className="px-3 py-4">{page.clarity}</td><td className="px-3 py-4">{page.semanticDepth}</td><td className="px-3 py-4">{page.structure}</td><td className="px-3 py-4">{page.evidence}</td><td className="px-3 py-4">{page.freshness}</td><td className="px-3 py-4">{page.faqReadiness ?? 0}</td><td className="px-3 py-4">{page.relatedQueries.length}</td>
               <td className="px-3 py-4"><TechnicalSignals page={page} /></td>
-              <td className="px-3 py-4"><button onClick={() => onOpenCms?.(page.url)} className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white">Open CMS</button></td>
+              <td className="px-3 py-4">{cmsUrls.has(normaliseUrl(page.url)) ? <button onClick={() => onOpenCms?.(page.url)} className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white">Open CMS</button> : <span className="text-xs text-slate-400">No CMS copy</span>}</td>
             </tr>
           ))}
         </tbody>
@@ -131,11 +137,14 @@ function OwnedPageCard({ page }: { page: OwnedPage }) {
 function TechnicalSignals({ page }: { page: OwnedPage }) {
   const tech = page.technicalSignals || {};
   const schemaTypes = tech.schemaTypes || [];
-  const jsonLdQuality = tech.jsonLdPresent
-    ? (schemaTypes.length >= 2 ? 'Present · good quality' : 'Present · partial')
-    : 'Missing';
+  const jsonLdQuality = tech.jsonLdPresent === undefined
+    ? 'Not checked'
+    : tech.jsonLdPresent
+      ? (schemaTypes.length >= 2 ? 'Present · good quality' : 'Present · partial')
+      : 'Missing';
   const tone = jsonLdQuality.startsWith('Present · good') ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
     : jsonLdQuality.startsWith('Present') || jsonLdQuality.startsWith('Partial') ? 'bg-amber-50 text-amber-800 border-amber-100'
+    : jsonLdQuality.startsWith('Not checked') ? 'bg-slate-50 text-slate-700 border-slate-200'
     : 'bg-red-50 text-red-800 border-red-100';
   const supporting = [
     tech.canonicalUrl ? 'canonical' : '',

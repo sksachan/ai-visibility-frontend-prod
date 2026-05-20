@@ -59,6 +59,8 @@ export interface CitationExample {
   sourceType: string;
   citationPosition?: number;
   snippet?: string;
+  queryId?: string;
+  query?: string;
   isCompetitor?: boolean;
   isOwnedTargetPage?: boolean;
 }
@@ -242,6 +244,7 @@ export interface ReportBundle {
     sourceTypeCounts: SourceTypeCount[];
     observedNonOwnedDomains: Array<{ domain: string; sourceType: string; observedCount: number; exampleUrl?: string; exampleQuery?: string }>;
     winningSourcePatterns: Array<{ sourceType: string; citationCount: number; winningPattern: string }>;
+    sourceCitations?: CitationExample[];
   };
   trend: TrendPoint[];
   queries: QueryDiagnostic[];

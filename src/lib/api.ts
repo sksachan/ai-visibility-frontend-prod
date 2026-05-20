@@ -142,7 +142,7 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
     return value ? !terminal.has(value) : false;
   };
   const activeRun = runs.find((run: Record<string, unknown>) => isActive(run)) || (!terminal.has(String(data?.stage ?? data?.status ?? data?.state ?? '').toLowerCase()) ? data : null);
-  const latestSuccess = runs.find((run: Record<string, unknown>) => ['success', 'successful', 'completed', 'succeeded', 'report_bundle_ready', 'evidence_ready'].includes(String(run.status ?? run.state ?? run.stage ?? '').toLowerCase()));
+  const latestSuccess = runs.find((run: Record<string, unknown>) => ['success', 'successful', 'completed', 'succeeded', 'report_bundle_ready'].includes(String(run.status ?? run.state ?? run.stage ?? '').toLowerCase()));
 
   return {
     active: Boolean(activeRun),
