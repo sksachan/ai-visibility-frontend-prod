@@ -9,7 +9,7 @@ function canonicalBundle(overrides: Record<string, unknown> = {}) {
     url: `https://www3.nissan.co.jp/test/page-${index + 1}.html`,
     title: '',
     current_geo_score_120: 30 + index,
-    geo_dimensions: { content_clarity: 10, structured_data: index < 25 ? 2 : 0 }
+    geo_dimensions: { content_clarity: 10, structured_data: index < 25 ? 2 : 0, eeat_signals: 7, freshness_index: 6 }
   }));
 
   return {
@@ -60,6 +60,8 @@ assert(parsedWrapped.ownedPages.length === 34, 'wrapped Preview Node fixture sho
 assert(parsedWrapped.ownedPages[0]?.geoScore === 30, 'canonical current_geo_score_120 should populate owned-page GEO score');
 assert(parsedWrapped.ownedPages[0]?.clarity === 10, 'canonical geo_dimensions should populate owned-page dimension scores');
 assert(parsedWrapped.ownedPages[0]?.structure === 2, 'canonical geo_dimensions.structured_data should populate owned-page structure score');
+assert(parsedWrapped.ownedPages[0]?.evidence === 7, 'canonical geo_dimensions.eeat_signals should populate owned-page E-E-A-T score');
+assert(parsedWrapped.ownedPages[0]?.freshness === 6, 'canonical geo_dimensions.freshness_index should populate owned-page freshness score');
 assert(parsedWrapped.aiHygiene?.structured_data?.pages_with_json_ld === undefined, 'GEO structured_data score must not be treated as JSON-LD evidence');
 assert(parsedWrapped.aiHygiene?.structured_data?.coverage_pct === undefined, 'missing explicit JSON-LD evidence should be not checked, not 0%');
 assert(parsedWrapped.aiHygiene?.priority === 'not checked', 'missing explicit hygiene should be marked not checked');
