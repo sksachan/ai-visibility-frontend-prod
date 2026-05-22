@@ -197,6 +197,7 @@ export interface QueryWorkbenchItem {
   query: string;
   query_type?: string;
   journey_category?: string;
+  brand_topic_category?: string;
   current_ai_visibility?: {
     score?: number;
     status?: string;
@@ -206,7 +207,18 @@ export interface QueryWorkbenchItem {
     competitor_citation_count?: number;
     top_citations?: CitationExample[];
   };
-  mapped_owned_urls?: Array<{ rank?: number; url: string; title?: string; mapping_score?: number; current_geo_score_120?: number; geo_gaps?: string[]; geo_dimensions?: Record<string, number> }>;
+  mapped_owned_urls?: Array<{
+    rank?: number;
+    url: string;
+    title?: string;
+    mapping_score?: number;
+    current_geo_score_120?: number;
+    geo_gaps?: string[];
+    geo_dimensions?: Record<string, number>;
+    scoring_method?: string;
+    scoring_notes?: string;
+    inventory_source?: string;
+  }>;
   external_top3_benchmark?: CitationExample[];
   winning_patterns?: Array<{ source_url?: string; source_domain?: string; source_type?: string; pattern_type?: string; owned_content_implication?: string; pr_implication?: string; evidence_basis?: string }>;
   cms_recommendations?: RecommendationModule[];
@@ -227,12 +239,25 @@ export interface ParserMeta {
   warnings: string[];
 }
 
+export interface BrandConfig {
+  brand: string;
+  market: string;
+  domain?: string;
+  ownedDomains?: string[];
+  brandTerms?: string[];
+}
+
 export interface ReportBundle {
   runId: string;
   brand: string;
   market: string;
+  domain?: string;
+  ownedDomains?: string[];
+  brandTerms?: string[];
   generatedAt: string;
   evidenceDate: string;
+  schemaVersion?: string;
+  contractVersion?: string;
   executive: ExecutiveSection;
   visibility: {
     brandScore: number;

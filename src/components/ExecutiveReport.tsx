@@ -84,9 +84,11 @@ function AiHygieneCard({ report }: { report: ReportBundle }) {
   const sd = hygiene.structured_data || {};
   const priority = String(hygiene.priority || 'medium').toLowerCase();
   const priorityClass = priority === 'high' ? 'border-red-200 bg-red-50 text-red-900' : priority === 'low' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900';
-  const schemaCoverage = sd.pages_with_json_ld === undefined || sd.coverage_pct === undefined
+  // JSON-LD 0% means checked and absent, not field missing.
+  // coverage_pct === 0 is a valid checked state; only undefined means not checked.
+  const schemaCoverage = sd.coverage_pct === undefined && sd.pages_with_json_ld === undefined
     ? 'not checked'
-    : `${sd.pages_with_json_ld}/${sd.owned_pages_total ?? 0} pages · ${sd.coverage_pct}%`;
+    : `${sd.pages_with_json_ld ?? 0}/${sd.owned_pages_total ?? report.ownedPages.length} pages · ${sd.coverage_pct ?? 0}%`;
   return (
     <Card className={priorityClass}>
       <SectionTitle eyebrow="AI Discoverability Hygiene" title="Priority technical controls for AI crawler and citation readiness">

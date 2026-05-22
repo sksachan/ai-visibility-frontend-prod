@@ -90,7 +90,7 @@ export function QueryWorkbench({ report }: { report: ReportBundle }) {
   return (
     <Card>
       <SectionTitle eyebrow="Query workbench" title={`Closed-loop query optimisation view (${filtered.length}/${rows.length})`}>
-        Query diagnostics and workbench are combined here. Each card shows Nissan AI visibility, competitor names, winning source types, leading citation domain and mapped owned URLs.
+        Query diagnostics and workbench are combined here. Each card shows {report.brand || 'brand'} AI visibility, competitor names, winning source types, leading citation domain and mapped owned URLs.
       </SectionTitle>
       <div className="mb-5 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Search query, URL, domain, competitor..." value={search} onChange={(event) => { setSearch(event.target.value); setVisibleCount(12); }} />
@@ -102,8 +102,8 @@ export function QueryWorkbench({ report }: { report: ReportBundle }) {
         </select>
         <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
           <option value="value">Sort: highest intervention value</option>
-          <option value="visibility_asc">Sort: lowest Nissan visibility</option>
-          <option value="visibility_desc">Sort: highest Nissan visibility</option>
+          <option value="visibility_asc">Sort: lowest {report.brand || 'brand'} visibility</option>
+          <option value="visibility_desc">Sort: highest {report.brand || 'brand'} visibility</option>
           <option value="external_desc">Sort: most external citations</option>
           <option value="competitor_desc">Sort: most competitor citations</option>
         </select>

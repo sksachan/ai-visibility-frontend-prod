@@ -1,0 +1,15 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+watchPatterns = ["src/**", "server.js", "package.json", "vite.config.ts", "index.html", "Dockerfile"]
+
+[deploy]
+startCommand = "node server.js"
+healthcheckPath = "/"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# IMPORTANT: Enable "Wait for CI" in Railway dashboard:
+# Settings → Deploy → Check "Wait for CI to pass before deploying"
+# This ensures GitHub Actions CI must pass before Railway deploys.

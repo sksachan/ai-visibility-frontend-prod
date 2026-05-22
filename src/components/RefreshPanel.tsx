@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, CircleDashed, PlayCircle, RefreshCcw, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, CircleDashed, Download, PlayCircle, RefreshCcw, Upload, XCircle } from 'lucide-react';
 import { fetchRefreshStatus, refreshEvidence, type RunStatusSummary } from '../lib/api';
 import { Card, SectionTitle } from './ui';
 
@@ -116,8 +116,12 @@ function valueFromRaw(raw: unknown, keys: string[]): string {
   return '';
 }
 
-export function RefreshPanel({ brand, market }: { brand: string; market: string }) {
-  const [domain, setDomain] = useState('https://www.nissan.co.jp');
+export function RefreshPanel({ brand: initialBrand, market: initialMarket }: { brand: string; market: string }) {
+  const [brand, setBrand] = useState(initialBrand || '');
+  const [market, setMarket] = useState(initialMarket || '');
+  const [domain, setDomain] = useState(import.meta.env.VITE_DEFAULT_DOMAIN || '');
+  const [ownedDomains, setOwnedDomains] = useState('');
+  const [brandTerms, setBrandTerms] = useState('');
   const [queryLimit, setQueryLimit] = useState(5);
   const [runMode, setRunMode] = useState('fresh_mapping');
   const [queryPortfolioMode, setQueryPortfolioMode] = useState('synthetic');
@@ -137,6 +141,9 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
   const [enableOwnedCrawl, setEnableOwnedCrawl] = useState(false);
   const [enableExternalCrawl, setEnableExternalCrawl] = useState(false);
   const [triggerAuditor, setTriggerAuditor] = useState(true);
+  const [customPortfolioJson, setCustomPortfolioJson] = useState('');
+  const [customPortfolioError, setCustomPortfolioError] = useState('');
+  const portfolioFileRef = useRef<HTMLInputElement>(null);
   const [trackedRunId, setTrackedRunId] = useState('');
   const [refreshResult, setRefreshResult] = useState<string | null>(null);
   const [status, setStatus] = useState<RunStatusSummary | null>(null);
@@ -205,7 +212,10 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
         enableSerpapi,
         enableOwnedCrawl,
         enableExternalCrawl,
-        triggerAuditor
+        triggerAuditor,
+        ownedDomains: ownedDomains.trim() || undefined,
+        brandTerms: brandTerms.trim() || undefined,
+        customPortfolio: queryPortfolioMode === 'upload' && customPortfolioJson.trim() ? (() => { try { return JSON.parse(customPortfolioJson); } catch { return undefined; } })() : undefined,
       });
       const id = result.targetRunId || result.evidenceRunId || result.runId || result.jobId || '';
       if (id) setTrackedRunId(id);
@@ -246,8 +256,22 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="text-sm font-medium text-slate-700">Domain
-            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={domain} onChange={(e) => setDomain(e.target.value)} />
+          <label className="text-sm font-medium text-slate-700">Brand
+            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. Nissan, Toyota, BMW" />
+          </label>
+          <label className="text-sm font-medium text-slate-700">Market
+            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={market} onChange={(e) => setMarket(e.target.value)} placeholder="e.g. Japan, USA, UK" />
+          </label>
+          <label className="text-sm font-medium text-slate-700">Primary domain
+            <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="e.g. https://www.nissan.co.jp" />
+          </label>
+          <label className="text-sm font-medium text-slate-700 md:col-span-3">Owned domains (one per line)
+            <textarea className="mt-1 min-h-16 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-xs" value={ownedDomains} onChange={(e) => setOwnedDomains(e.target.value)} placeholder={"nissan.co.jp\nwww.nissan.co.jp\nnissan-global.com"} />
+            <span className="mt-1 block text-xs font-normal text-slate-500">URLs matching these domains are classified as owned. Leave blank to use built-in defaults for known brands.</span>
+          </label>
+          <label className="text-sm font-medium text-slate-700 md:col-span-3">Brand terms for NLP (one per line)
+            <textarea className="mt-1 min-h-12 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-xs" value={brandTerms} onChange={(e) => setBrandTerms(e.target.value)} placeholder={"Nissan\n日産\nニッサン"} />
+            <span className="mt-1 block text-xs font-normal text-slate-500">Brand-specific terms used as stop words in NLP classification. Leave blank to use built-in defaults.</span>
           </label>
           <label className="text-sm font-medium text-slate-700">Run mode
             <select className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={runMode} onChange={(e) => setRunMode(e.target.value)}>
@@ -260,12 +284,35 @@ export function RefreshPanel({ brand, market }: { brand: string; market: string 
             </select>
           </label>
           <label className="text-sm font-medium text-slate-700">Query portfolio mode
-            <select className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={queryPortfolioMode} onChange={(e) => setQueryPortfolioMode(e.target.value)}>
+            <select className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={queryPortfolioMode} onChange={(e) => { setQueryPortfolioMode(e.target.value); setCustomPortfolioError(''); }}>
               <option value="synthetic">Synthetic via Bodhi DeepResearch workflow</option>
+              <option value="upload">Upload custom topics & queries</option>
               <option value="manual">Manual / stored portfolio ID</option>
               <option value="reuse">Reuse existing portfolio</option>
             </select>
           </label>
+          {queryPortfolioMode === 'upload' && (
+            <div className="text-sm font-medium text-slate-700 md:col-span-3">
+              <div className="flex items-center justify-between">
+                <span>Custom topics & queries portfolio</span>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => portfolioFileRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <Upload size={12} /> Upload JSON
+                  </button>
+                  <button type="button" onClick={async () => { try { const res = await fetch('/api/evidence/portfolios/template'); const tmpl = await res.json(); setCustomPortfolioJson(JSON.stringify(tmpl, null, 2)); setCustomPortfolioError(''); } catch { setCustomPortfolioError('Could not fetch template'); } }} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <Download size={12} /> Load template
+                  </button>
+                </div>
+              </div>
+              <input ref={portfolioFileRef} className="hidden" type="file" accept="application/json,.json" onChange={async (e) => { const file = e.target.files?.[0]; if (!file) return; try { const text = await file.text(); JSON.parse(text); setCustomPortfolioJson(text); setCustomPortfolioError(''); } catch { setCustomPortfolioError('Invalid JSON file'); } if (portfolioFileRef.current) portfolioFileRef.current.value = ''; }} />
+              <textarea className="mt-1 min-h-40 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-xs" value={customPortfolioJson} onChange={(e) => { setCustomPortfolioJson(e.target.value); setCustomPortfolioError(''); }} placeholder='{
+  "topics": [{"topic": "EV Range", "category": "Product"}],
+  "queries": [{"query": "best EV range 2026", "topic": "EV Range", "intent": "informational"}]
+}' />
+              {customPortfolioError && <p className="mt-1 text-xs font-medium text-red-600">{customPortfolioError}</p>}
+              <span className="mt-1 block text-xs font-normal text-slate-500">Paste or upload a JSON file with topics[] and queries[] arrays. This bypasses the Bodhi portfolio builder workflow.</span>
+            </div>
+          )}
           <label className="text-sm font-medium text-slate-700">Existing portfolio ID
             <input className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2" value={queryPortfolioId} onChange={(e) => setQueryPortfolioId(e.target.value)} placeholder="Optional; identifies the query portfolio only" />
           </label>

@@ -9,6 +9,36 @@ const distDir = path.join(__dirname, 'dist');
 
 app.use(express.json({ limit: '30mb' }));
 
+// --- Environment variable validation on startup (Task 19) ---
+function validateFrontendEnv() {
+  const warnings = [];
+  const info = [];
+
+  const evidenceUrl = env('EVIDENCE_SERVICE_URL', 'VITE_EVIDENCE_SERVICE_URL', 'VITE_API_BASE_URL');
+  if (!evidenceUrl) {
+    warnings.push('EVIDENCE_SERVICE_URL is not set; Evidence Service integration will fail.');
+  } else {
+    info.push(`EVIDENCE_SERVICE_URL=${evidenceUrl}`);
+  }
+
+  const bodhiPat = env('BODHI_PAT_TOKEN', 'BODHI_PAT', 'BODHI_API_TOKEN');
+  if (!bodhiPat) {
+    warnings.push('BODHI_PAT_TOKEN is not set; Bodhi report loading will fail.');
+  }
+
+  const taskId = env('BODHI_TASK_ID');
+  if (!taskId) {
+    info.push('BODHI_TASK_ID is not set; latest Bodhi run lookup unavailable.');
+  }
+
+  warnings.forEach((w) => console.warn(`[ENV WARNING] ${w}`));
+  info.forEach((i) => console.log(`[ENV INFO] ${i}`));
+
+  return { warnings, info };
+}
+
+const startupEnvCheck = validateFrontendEnv();
+
 function env(...names) {
   for (const name of names) {
     const value = process.env[name];
@@ -275,8 +305,8 @@ function candidateEvidenceUrls(req) {
   const base = cleanBase(env('EVIDENCE_SERVICE_URL', 'VITE_EVIDENCE_SERVICE_URL', 'VITE_API_BASE_URL', 'BODHI_EVIDENCE_SERVICE_URL'));
   if (!base) return [];
 
-  const brand = String(req.query.brand || process.env.DEFAULT_BRAND || 'Nissan');
-  const market = String(req.query.market || process.env.DEFAULT_MARKET || 'Japan');
+  const brand = String(req.query.brand || process.env.DEFAULT_BRAND || '');
+  const market = String(req.query.market || process.env.DEFAULT_MARKET || '');
   const domain = String(req.query.domain || process.env.DEFAULT_DOMAIN || '');
   const explicitRunId = String(req.query.runId || req.query.run_id || '').trim();
   const paramsObj = domain ? { brand, market, domain } : { brand, market };
@@ -313,9 +343,9 @@ function normaliseRefreshPayload(body = {}) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   };
   return {
-    brand: String(body.brand || process.env.DEFAULT_BRAND || 'Nissan'),
-    market: String(body.market || process.env.DEFAULT_MARKET || 'Japan'),
-    domain: String(body.domain || process.env.DEFAULT_DOMAIN || 'https://www.nissan.co.jp'),
+    brand: String(body.brand || process.env.DEFAULT_BRAND || ''),
+    market: String(body.market || process.env.DEFAULT_MARKET || ''),
+    domain: String(body.domain || process.env.DEFAULT_DOMAIN || ''),
     run_mode: String(body.runMode || body.run_mode || 'reuse_existing_evidence'),
     query_portfolio_mode: String(body.queryPortfolioMode || body.query_portfolio_mode || 'reuse'),
     query_portfolio_id: String(body.queryPortfolioId || body.query_portfolio_id || ''),
@@ -339,6 +369,11 @@ function normaliseRefreshPayload(body = {}) {
     enable_external_crawl: bool(body.enableExternalCrawl ?? body.enable_external_crawl, false),
     crawl_external: bool(body.enableExternalCrawl ?? body.enable_external_crawl ?? body.crawl_external, false),
     trigger_auditor: bool(body.triggerAuditor ?? body.trigger_auditor, true),
+    // Multi-brand support: pass owned domains and brand terms to evidence service
+    owned_domains: Array.isArray(body.ownedDomains ?? body.owned_domains) ? (body.ownedDomains ?? body.owned_domains) : String(body.ownedDomains ?? body.owned_domains ?? '').split('\n').map(s => s.trim()).filter(Boolean),
+    brand_terms: Array.isArray(body.brandTerms ?? body.brand_terms) ? (body.brandTerms ?? body.brand_terms) : String(body.brandTerms ?? body.brand_terms ?? '').split('\n').map(s => s.trim()).filter(Boolean),
+    // Custom portfolio upload support
+    custom_portfolio: body.customPortfolio ?? body.custom_portfolio ?? null,
     requested_by: 'ai-visibility-frontend',
     note: 'Evidence refresh is executed by Railway evidence service. Frontend continues to load latest successful report until a new successful bundle is available.'
   };
@@ -393,7 +428,7 @@ app.get('/api/bodhi/latest', async (req, res) => {
 app.get('/api/evidence/reports/history', async (req, res) => {
   const base = evidenceBase();
   if (!base) { res.status(503).json({ error: 'EVIDENCE_SERVICE_URL is not configured on the frontend Railway service.' }); return; }
-  const params = new URLSearchParams({ brand: String(req.query.brand || process.env.DEFAULT_BRAND || 'Nissan'), market: String(req.query.market || process.env.DEFAULT_MARKET || 'Japan'), limit: String(req.query.limit || '30') });
+  const params = new URLSearchParams({ brand: String(req.query.brand || process.env.DEFAULT_BRAND || ''), market: String(req.query.market || process.env.DEFAULT_MARKET || ''), limit: String(req.query.limit || '30') });
   try {
     const response = await fetch(`${base}/reports/history?${params.toString()}`, { headers: { Accept: 'application/json' }, cache: 'no-store' });
     const text = await response.text();
@@ -439,8 +474,8 @@ app.get('/api/evidence/status', async (req, res) => {
     return;
   }
 
-  const brand = String(req.query.brand || process.env.DEFAULT_BRAND || 'Nissan');
-  const market = String(req.query.market || process.env.DEFAULT_MARKET || 'Japan');
+  const brand = String(req.query.brand || process.env.DEFAULT_BRAND || '');
+  const market = String(req.query.market || process.env.DEFAULT_MARKET || '');
   const runId = String(req.query.runId || req.query.run_id || '').trim();
   const params = new URLSearchParams({ brand, market }).toString();
   try {

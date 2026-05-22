@@ -154,14 +154,17 @@ function OwnedPageCard({ page }: { page: OwnedPage }) {
 function TechnicalSignals({ page }: { page: OwnedPage }) {
   const tech = page.technicalSignals || {};
   const schemaTypes = tech.schemaTypes || [];
+  // JSON-LD false means checked and absent (0%), not "field missing".
+  // Only undefined means the check was never performed.
   const jsonLdQuality = tech.jsonLdPresent === undefined
     ? 'Not checked'
     : tech.jsonLdPresent
       ? (schemaTypes.length >= 2 ? 'Present · good quality' : 'Present · partial')
-      : 'Missing';
+      : 'Checked · absent (0%)';
   const tone = jsonLdQuality.startsWith('Present · good') ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
     : jsonLdQuality.startsWith('Present') || jsonLdQuality.startsWith('Partial') ? 'bg-amber-50 text-amber-800 border-amber-100'
     : jsonLdQuality.startsWith('Not checked') ? 'bg-slate-50 text-slate-700 border-slate-200'
+    : jsonLdQuality.startsWith('Checked') ? 'bg-red-50 text-red-800 border-red-100'
     : 'bg-red-50 text-red-800 border-red-100';
   const supporting = [
     tech.canonicalUrl ? 'canonical' : '',

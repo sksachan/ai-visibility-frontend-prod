@@ -1,7 +1,31 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter, ZAxis, Cell, LabelList } from 'recharts';
 import type { CitationExample, ReportBundle } from '../types/report';
 import { Card, SectionTitle } from './ui';
+
+/** Guard: only render ResponsiveContainer when parent has positive dimensions */
+function SafeResponsiveContainer({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => {
+      const { width, height } = el.getBoundingClientRect();
+      if (width > 0 && height > 0) setReady(true);
+    };
+    check();
+    if (!ready) {
+      const timer = window.setTimeout(check, 100);
+      return () => window.clearTimeout(timer);
+    }
+  }, [ready]);
+  return (
+    <div ref={ref} style={{ width: '100%', height: '100%', minWidth: 1, minHeight: 1 }}>
+      {ready ? <ResponsiveContainer width="100%" height="100%">{children}</ResponsiveContainer> : null}
+    </div>
+  );
+}
 
 const label = (value: string) => value.replaceAll('_', ' ');
 const palette = ['#0f172a', '#334155', '#475569', '#64748b', '#94a3b8', '#1e293b', '#475569', '#64748b'];
@@ -66,7 +90,7 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
         </div>
         <div className="h-[34rem] rounded-2xl bg-slate-50 p-3">
           {data.length ? (
-            <ResponsiveContainer width="100%" height="100%">
+            <SafeResponsiveContainer>
               <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 90 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="x" type="number" domain={[-0.5, Math.max(0.5, axisValues.length - 0.5)]} ticks={axisValues.map((_, index) => index)} tickFormatter={(value) => label(axisValues[Number(value)] ?? '')} angle={-35} textAnchor="end" interval={0} height={90} />
@@ -82,7 +106,7 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
                   {data.map((point) => <Cell key={`${point.domain}-${point.sourceType}`} fill={palette[point.x % palette.length]} />)}
                 </Scatter>
               </ScatterChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           ) : <Empty>No observed non-owned domain array was found in the uploaded file.</Empty>}
         </div>
       </Card>
@@ -107,7 +131,7 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
                   <td className="px-3 py-4">{label(item.sourceType || 'unknown')}</td>
                   <td className="px-3 py-4"><p className="font-semibold text-slate-900">{item.domain || 'not supplied'}</p>{item.url && <p className="break-all text-xs text-slate-500">{item.url}</p>}</td>
                   <td className="px-3 py-4"><p className="font-mono text-xs text-slate-500">{item.queryId}</p><p className="max-w-xs text-slate-700">{item.query}</p></td>
-                  <td className="max-w-lg px-3 py-4 text-slate-700"><p className="font-medium text-slate-900">{item.title}</p>{item.snippet ? <p className="mt-1">{item.snippet}</p> : <p className="mt-1 text-slate-400">Citation text not supplied.</p>}</td>
+                  <td className="max-w-lg px-3 py-4 text-slate-700"><p className="font-medium text-slate-900">{item.title}</p>{item.snippet ? <p className="mt-1">{item.snippet}</p> : <p className="mt-1 text-slate-400">Citation text not supplied.</p>}{typeof item.citationPosition === 'number' && <p className="mt-1 text-xs text-slate-400">Rank: {item.citationPosition}</p>}</td>
                 </tr>
               ))}
             </tbody>

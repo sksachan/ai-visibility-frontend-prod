@@ -56,8 +56,9 @@ Bodhi PAT tokens expire after 2 days, so rotate the Railway secret regularly.
 Set these Railway variables:
 
 ```bash
-BODHI_API_BASE_URL=https://psaisuite.com/save
+BODHI_API_BASE_URL=https://sapientaiproducts.com/save
 BODHI_PAT_TOKEN=pat_<YOUR_TOKEN>
+# Staging: 3166f133-2558-4473-9adb-d3ea8171ec2e
 BODHI_TASK_ID=<TASK_UUID>
 BODHI_OUTPUT_FILE=outputs.json
 ```
