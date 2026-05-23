@@ -27,16 +27,18 @@ const navGroups: NavGroup[] = [
   ]},
   { label: 'AEO Insights', items: [
     { id: 'workbench', label: 'Query Workbench', icon: Search },
-    { id: 'matrix', label: 'Visibility & Sources', icon: Layers },
+    { id: 'matrix', label: 'Source Landscape', icon: Layers },
   ]},
-  { label: '', items: [
-    { id: 'owned', label: 'GEO Insights', icon: BarChart3 },
-    { id: 'cms', label: 'Content Insights', icon: FileText },
-    { id: 'pr', label: 'PR & Brand Insights', icon: Zap },
+  { label: 'GEO Insights', items: [
+    { id: 'owned', label: 'Owned URLs Readiness', icon: BarChart3 },
+  ]},
+  { label: 'Recommendations', items: [
+    { id: 'cms', label: 'Content Alignment', icon: FileText },
+    { id: 'pr', label: 'PR & Brand Suggestions', icon: Zap },
     { id: 'actions', label: 'Action Checklist', icon: Activity },
   ]},
-  { label: '', items: [
-    { id: 'refresh', label: 'Refresh Evidence', icon: RefreshCcw },
+  { label: 'Onboarding', items: [
+    { id: 'refresh', label: 'Start New Analysis', icon: RefreshCcw },
   ]},
 ];
 
@@ -142,9 +144,8 @@ export default function App() {
       <aside className="hidden lg:flex h-full w-56 shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-surface)] no-print overflow-y-auto hide-scrollbar">
         {/* Brand mark */}
         <div className="px-4 pt-5 pb-4 border-b border-[var(--border-subtle)]">
-          <p className="typo-meta text-[var(--accent-blue)]">Bodhi</p>
           <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">AI Brand Visibility</p>
-          <p className="text-[11px] text-[var(--text-muted)]">Intelligence</p>
+          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">Intelligence</p>
         </div>
 
         {/* Navigation */}
@@ -202,15 +203,14 @@ export default function App() {
             <div className="flex items-center justify-between gap-4 px-5 py-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="hidden lg:flex items-center gap-2 text-[13px] text-[var(--text-muted)]">
-                  <span className="font-semibold text-[var(--accent-blue)]">Bodhi</span>
-                  <span>/</span>
-                  <span className="text-[var(--text-primary)] font-medium">AI Brand Visibility Intelligence</span>
+                  <span className="font-semibold text-[var(--accent-blue)]">Powered by Bodhi</span>
+                  <img src="/bodhi-mark.svg" alt="Bodhi logo" className="h-4" />
                   <span>/</span>
                   <span className="text-[var(--text-secondary)]">{report.brand} · {report.market}</span>
                 </div>
                 {/* Mobile brand */}
                 <div className="lg:hidden">
-                  <p className="typo-meta text-[var(--accent-blue)]">Bodhi</p>
+                  <p className="typo-meta text-[var(--accent-blue)]">Sapient AI Bodhi</p>
                   <p className="text-sm font-semibold text-[var(--text-primary)]">AI Brand Visibility Intelligence</p>
                 </div>
               </div>
