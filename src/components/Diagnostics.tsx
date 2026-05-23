@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
+import { useMemo, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import type { OwnedPage, ReportBundle } from '../types/report';
 import { WorkspacePanel, SectionHeader, DarkButton } from './ui';
 
@@ -155,25 +155,24 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
         {graphMode === 'comparison' && (
           <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
             <p className="mb-3 text-sm text-[var(--text-secondary)]">
-              GEO readiness by 6 dimensions for each brand topic. Compare dimension strengths across topics.
+              Average of 6 GEO dimensions by journey categories (brand topics). Compare dimension strengths across topics.
             </p>
             <div className="h-96">
               {comparisonData.length ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={dimensionKeys.map((k) => {
-                    const row: Record<string, unknown> = { dimension: dimensionLabels[k] };
-                    comparisonData.forEach((topic) => { row[topic.topic as string] = topic[k]; });
-                    return row;
-                  })}>
-                    <PolarGrid stroke="var(--border-subtle)" />
-                    <PolarAngleAxis dataKey="dimension" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-                    <PolarRadiusAxis domain={[0, 20]} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-                    {comparisonData.slice(0, 6).map((topic, i) => (
-                      <Radar key={topic.topic as string} name={topic.topic as string} dataKey={topic.topic as string} stroke={dimPalette[i % dimPalette.length]} fill={dimPalette[i % dimPalette.length]} fillOpacity={0.15} />
+                  <BarChart data={comparisonData} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+                    <XAxis dataKey="topic" angle={-25} textAnchor="end" interval={0} height={60} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
+                    <YAxis domain={[0, 20]} label={{ value: 'Avg score /20', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)' }} tick={{ fill: 'var(--text-secondary)' }} />
+                    {dimensionKeys.map((k, i) => (
+                      <Bar key={k} dataKey={k} name={dimensionLabels[k]} fill={dimPalette[i % dimPalette.length]} />
                     ))}
                     <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-secondary)' }} />
-                    <Tooltip />
-                  </RadarChart>
+                    <Tooltip content={({ active, payload, label: topicLabel }) => {
+                      if (!active || !payload?.length) return null;
+                      return <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3 text-sm shadow-lg"><p className="font-semibold text-[var(--text-primary)] mb-1">{topicLabel}</p>{payload.map((p) => <p key={String(p.dataKey)} className="text-[var(--text-secondary)]"><span style={{ color: p.color }}>●</span> {String(p.name)}: {p.value}/20</p>)}</div>;
+                    }} />
+                  </BarChart>
                 </ResponsiveContainer>
               ) : <p className="text-sm text-[var(--text-muted)]">No topic data available for comparison. Pages need journey categories or related queries.</p>}
             </div>

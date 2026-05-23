@@ -292,19 +292,22 @@ export default function App() {
             <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3">
               <p className="typo-meta text-[var(--text-muted)] mb-2">Run Status</p>
               <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : refreshStatus?.stage && ['failed', 'error'].includes(refreshStatus.stage.toLowerCase()) ? 'bg-[var(--accent-danger)]' : 'bg-[var(--accent-success)]'}`} />
+                <span className={`h-2 w-2 rounded-full shrink-0 ${refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : refreshStatus?.stage && ['failed', 'error'].includes(refreshStatus.stage.toLowerCase()) ? 'bg-[var(--accent-danger)]' : 'bg-[var(--accent-success)]'}`} />
                 <span className={`text-xs font-medium ${refreshStatus?.active ? 'text-[var(--accent-blue)]' : refreshStatus?.stage && ['failed', 'error'].includes(refreshStatus.stage.toLowerCase()) ? 'text-[var(--accent-danger)]' : 'text-[var(--accent-success)]'}`}>
-                  {refreshStatus?.active ? 'Analysis running' : refreshStatus?.stage && ['failed', 'error'].includes(refreshStatus.stage.toLowerCase()) ? 'Failed' : refreshStatus?.stage === 'report_bundle_ready' ? 'Complete' : 'Idle'}
+                  {refreshStatus?.active ? 'Running' : refreshStatus?.stage && ['failed', 'error'].includes(refreshStatus.stage.toLowerCase()) ? 'Failed' : refreshStatus?.stage === 'report_bundle_ready' ? 'Complete' : 'Idle'}
                 </span>
               </div>
-              {refreshStatus?.stage && (
+              {refreshStatus?.active && refreshStatus?.stage && (
+                <p className="mt-2 text-[11px] text-[var(--accent-blue)]">{niceStage(refreshStatus.stage)}</p>
+              )}
+              {refreshStatus?.active && refreshStatus?.runId && (
+                <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">Run: {refreshStatus.runId}</p>
+              )}
+              {!refreshStatus?.active && refreshStatus?.stage && refreshStatus.stage !== 'report_bundle_ready' && (
                 <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{niceStage(refreshStatus.stage)}</p>
               )}
-              {refreshStatus?.runId && (
-                <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">{refreshStatus.runId}</p>
-              )}
               {refreshStatus?.latestSuccessfulRunId && (
-                <p className="mt-2 text-[10px] text-[var(--text-muted)]">Last success: <span className="font-mono">{refreshStatus.latestSuccessfulRunId}</span></p>
+                <p className="mt-2 text-[10px] text-[var(--text-muted)] break-all">Last success:<br /><span className="font-mono">{refreshStatus.latestSuccessfulRunId}</span></p>
               )}
             </div>
 
