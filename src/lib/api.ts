@@ -135,8 +135,10 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
   const terminalStages = ['completed', 'success', 'successful', 'succeeded', 'report_bundle_ready', 'failed', 'error'];
   const isTerminal = terminalStages.includes(stage.toLowerCase()) || terminalStages.includes(status.toLowerCase());
 
-  // active = true when there IS an active_run from the backend, OR when querying a specific run that is not terminal
-  const active = activeRun !== null || (isDirectRunStatus && Boolean(stage) && !isTerminal);
+// active = true only when the backend returns an active_run that is NOT in a terminal state.
+// Previously this was `activeRun !== null` which incorrectly showed 'Running' when the
+// backend returned a completed run as active_run (now fixed server-side too).
+const active = (activeRun !== null && !isTerminal) || (isDirectRunStatus && Boolean(stage) && !isTerminal);
 
   return {
     active,
