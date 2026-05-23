@@ -71,13 +71,17 @@ export default function App() {
   useEffect(() => {
     void loadLatest(true);
     void pollRefreshStatus();
-    const timer = window.setInterval(() => void pollRefreshStatus(), 30000);
+    // Poll every 10s to keep status responsive; backend call is lightweight
+    const timer = window.setInterval(() => void pollRefreshStatus(), 10000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function pollRefreshStatus() {
-    try { setRefreshStatus(await fetchRefreshStatus(brand, market)); } catch { /* advisory */ }
+    try {
+      const next = await fetchRefreshStatus(brand, market);
+      setRefreshStatus(next);
+    } catch { /* advisory — status is non-blocking */ }
   }
 
   async function loadLatest(isInitialLoad = false) {
@@ -292,9 +296,9 @@ export default function App() {
             <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3">
               <p className="typo-meta text-[var(--text-muted)] mb-2">Run Status</p>
               <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full shrink-0 ${refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : refreshStatus?.stage && ['failed', 'error'].includes(refreshStatus.stage.toLowerCase()) ? 'bg-[var(--accent-danger)]' : 'bg-[var(--accent-success)]'}`} />
-                <span className={`text-xs font-medium ${refreshStatus?.active ? 'text-[var(--accent-blue)]' : refreshStatus?.stage && ['failed', 'error'].includes(refreshStatus.stage.toLowerCase()) ? 'text-[var(--accent-danger)]' : 'text-[var(--accent-success)]'}`}>
-                  {refreshStatus?.active ? 'Running' : refreshStatus?.stage && ['failed', 'error'].includes(refreshStatus.stage.toLowerCase()) ? 'Failed' : refreshStatus?.stage === 'report_bundle_ready' ? 'Complete' : 'Idle'}
+                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : refreshStatus?.stage && ['failed', 'error'].includes(String(refreshStatus.stage).toLowerCase()) ? 'bg-[var(--accent-danger)]' : 'bg-[var(--accent-success)]'}`} />
+                <span className={`text-sm font-semibold ${refreshStatus?.active ? 'text-[var(--accent-blue)]' : refreshStatus?.stage && ['failed', 'error'].includes(String(refreshStatus.stage).toLowerCase()) ? 'text-[var(--accent-danger)]' : 'text-[var(--accent-success)]'}`}>
+                  {refreshStatus?.active ? 'Running' : refreshStatus?.stage && ['failed', 'error'].includes(String(refreshStatus.stage).toLowerCase()) ? 'Failed' : 'Idle'}
                 </span>
               </div>
               {refreshStatus?.active && refreshStatus?.stage && (
@@ -303,11 +307,14 @@ export default function App() {
               {refreshStatus?.active && refreshStatus?.runId && (
                 <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">Run: {refreshStatus.runId}</p>
               )}
-              {!refreshStatus?.active && refreshStatus?.stage && refreshStatus.stage !== 'report_bundle_ready' && (
+              {!refreshStatus?.active && refreshStatus?.stage && !['report_bundle_ready', 'completed', 'success'].includes(String(refreshStatus.stage).toLowerCase()) && (
                 <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{niceStage(refreshStatus.stage)}</p>
               )}
               {refreshStatus?.latestSuccessfulRunId && (
-                <p className="mt-2 text-[10px] text-[var(--text-muted)] break-all">Last success:<br /><span className="font-mono">{refreshStatus.latestSuccessfulRunId}</span></p>
+                <div className="mt-2 text-[10px] text-[var(--text-muted)] break-all">
+                  <p>Last success:</p>
+                  <p className="font-mono mt-0.5">{refreshStatus.latestSuccessfulRunId}</p>
+                </div>
               )}
             </div>
 

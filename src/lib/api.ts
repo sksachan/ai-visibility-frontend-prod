@@ -119,13 +119,32 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
   if (runId) params.set('runId', runId);
   const res = await fetch(`/api/evidence/status?${params}`);
   const raw = await jsonOrThrow(res) as Record<string, unknown>;
+
+  // The backend /runs/status returns { status: 'ok', latest_successful_run_id, active_run: {...}, runs: [...] }
+  // When querying a specific runId, it returns the run status directly.
+  // We need to extract the active run data from the nested active_run object when present.
+  const activeRun = (raw.active_run && typeof raw.active_run === 'object') ? raw.active_run as Record<string, unknown> : null;
+
+  // For specific run queries, the response IS the run status directly (has stage/run_id at top level).
+  // For brand/market queries, the active run is nested inside active_run.
+  const isDirectRunStatus = Boolean(raw.stage || raw.current_stage) && raw.status !== 'ok';
+  const source = isDirectRunStatus ? raw : (activeRun || raw);
+
+  const stage = String(source.stage || source.current_stage || '');
+  const status = String(source.status || '');
+  const terminalStages = ['completed', 'success', 'successful', 'succeeded', 'report_bundle_ready', 'failed', 'error'];
+  const isTerminal = terminalStages.includes(stage.toLowerCase()) || terminalStages.includes(status.toLowerCase());
+
+  // active = true when there IS an active_run from the backend, OR when querying a specific run that is not terminal
+  const active = activeRun !== null || (isDirectRunStatus && Boolean(stage) && !isTerminal);
+
   return {
-    active: Boolean(raw.active ?? raw.is_active ?? (raw.stage && !['completed', 'success', 'successful', 'succeeded', 'report_bundle_ready', 'failed', 'error'].includes(String(raw.stage || raw.status || '').toLowerCase()))),
-    stage: String(raw.stage || raw.current_stage || ''),
-    status: String(raw.status || ''),
-    runId: String(raw.run_id || raw.runId || raw.target_run_id || ''),
-    targetRunId: String(raw.target_run_id || raw.run_id || ''),
-    jobId: String(raw.job_id || raw.jobId || ''),
+    active,
+    stage: stage || undefined,
+    status,
+    runId: String(source.run_id || source.runId || source.target_run_id || ''),
+    targetRunId: String(source.target_run_id || source.run_id || ''),
+    jobId: String(source.job_id || source.jobId || ''),
     latestSuccessfulRunId: String(raw.latest_successful_run_id || raw.latestSuccessfulRunId || ''),
     raw,
   };

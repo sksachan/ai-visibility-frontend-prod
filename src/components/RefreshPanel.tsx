@@ -68,10 +68,11 @@ function statusText(status: RunStatusSummary | null, trackedRunId: string) {
   const id = runIdFrom(status, trackedRunId);
   if (!status && trackedRunId) return `Tracking: ${trackedRunId}`;
   if (!status) return 'Status not checked yet.';
+  // When backend is actively processing, show the current stage and run ID
   if (status.active) return `${niceStage(status.stage || status.status)}${id ? ` \u00b7 ${id}` : ''}`;
-  if (id && (status.stage || status.status)) return `${niceStage(status.stage || status.status)}${id ? ` \u00b7 ${id}` : ''}`;
-  if (status.latestSuccessfulRunId) return `Latest: ${status.latestSuccessfulRunId}`;
-  return 'No active refresh run detected.';
+  // When idle (no active run), show waiting message with latest successful run info
+  if (status.latestSuccessfulRunId) return `Waiting to start \u00b7 Last success: ${status.latestSuccessfulRunId}`;
+  return 'Waiting to start \u00b7 No previous successful runs.';
 }
 
 function valueFromRaw(raw: unknown, keys: string[]): string {
@@ -214,11 +215,29 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
         <SectionHeader eyebrow="Workflow Status" title={statusText(status, trackedRunId)} />
         <div className="flex flex-wrap gap-2">
           {workflowStages.map((stage, index) => {
-            const state = isFailed && currentWfKey === stage.key ? 'failed' : isDone || (wfIdx >= 0 && index < wfIdx) ? 'done' : currentWfKey === stage.key ? 'active' : 'pending';
+            // When idle (no active run), all stages should show as pending (waiting to start)
+            // When running, show done/active/pending based on current stage
+            // When completed/done, show all stages as done
+            let state: 'pending' | 'active' | 'done' | 'failed';
+            if (!status?.active && !isDone) {
+              // Idle state - no active run, show all as pending
+              state = 'pending';
+            } else if (isFailed && currentWfKey === stage.key) {
+              state = 'failed';
+            } else if (isDone) {
+              state = 'done';
+            } else if (wfIdx >= 0 && index < wfIdx) {
+              state = 'done';
+            } else if (currentWfKey === stage.key) {
+              state = 'active';
+            } else {
+              state = 'pending';
+            }
             return <WorkflowStage key={stage.key} label={stage.label} state={state} />;
           })}
         </div>
-        {trackedRunId && <p className="mt-3 text-xs font-mono text-[var(--text-muted)]">Run: {trackedRunId}</p>}
+        {status?.active && trackedRunId && <p className="mt-3 text-xs font-mono text-[var(--accent-blue)]">Currently running: {trackedRunId}</p>}
+        {!status?.active && trackedRunId && <p className="mt-3 text-xs font-mono text-[var(--text-muted)]">Last tracked: {trackedRunId}</p>}
         <div className="mt-3 flex gap-2">
           <DarkButton onClick={() => void checkStatus()} disabled={isChecking}><RefreshCcw size={13} /> {isChecking ? 'Checking...' : 'Check status'}</DarkButton>
         </div>
