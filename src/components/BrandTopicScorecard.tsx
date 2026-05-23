@@ -35,7 +35,7 @@ export function BrandTopicScorecard({ rows }: { rows: BrandTopicScorecardRow[] }
                 <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Brand topic</th>
                 <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">AI visibility score</th>
                 <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Relative position vs. key competitor</th>
-                <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Direction vs. last period</th>
+                <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Avg brand sentiment</th>
                 <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Comment</th>
               </tr>
             </thead>
@@ -54,7 +54,7 @@ export function BrandTopicScorecard({ rows }: { rows: BrandTopicScorecardRow[] }
                   </td>
                   <td className="max-w-sm px-4 py-4 text-sm leading-6 text-[var(--text-secondary)]">{row.relativePosition}</td>
                   <td className="px-4 py-4">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${directionTone(row.directionVsLastPeriod)}`}>{row.directionVsLastPeriod}</span>
+                    <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${directionTone(row.directionVsLastPeriod)}`}>{row.directionVsLastPeriod !== 'Not available' ? row.directionVsLastPeriod : 'N/A'}</span>
                   </td>
                   <td className="max-w-md px-4 py-4 text-sm leading-6 text-[var(--text-secondary)]">{row.comment}</td>
                 </tr>

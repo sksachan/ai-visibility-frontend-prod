@@ -134,6 +134,21 @@ function WorkbenchCard({ row, ownedPages }: { row: QueryWorkbenchItem; ownedPage
           <StatusPill status={vis.status || 'not_observed'} />
         </div>
       </div>
+      {/* Sentiment tag */}
+      <div className="mt-3">
+        {vis.brand_mentioned ? (
+          <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
+            vis.brand_sentiment === 'positive' ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20' :
+            vis.brand_sentiment === 'negative' ? 'bg-red-500/10 text-red-400 ring-1 ring-red-500/20' :
+            vis.brand_sentiment === 'mixed' ? 'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20' :
+            'bg-white/5 text-[var(--text-muted)] ring-1 ring-white/10'
+          }`}>
+            Sentiment: {vis.brand_sentiment || 'neutral'}{vis.brand_sentiment_score != null ? ` (${vis.brand_sentiment_score > 0 ? '+' : ''}${vis.brand_sentiment_score})` : ''}
+          </span>
+        ) : (
+          <span className="inline-flex rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-[var(--text-muted)] ring-1 ring-white/10">Sentiment: N/A</span>
+        )}
+      </div>
       <div className="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
         {showCompetitors && <Metric label="Competitors" value={competitors || `${vis.competitor_citation_count ?? 0} competitor citations`} />}
         <Metric label="Winning source types" value={types} />

@@ -9,6 +9,7 @@ import { ActionChecklist, CmsRecommendations, PrRecommendations } from './compon
 import { RefreshPanel } from './components/RefreshPanel';
 import { RunHistory } from './components/RunHistory';
 import { MethodologyAppendix } from './components/MethodologyAppendix';
+import { PdfReport } from './components/PdfReport';
 import { fetchLatestReport, fetchRefreshStatus, type RunStatusSummary } from './lib/api';
 import { exportReportToPdf } from './lib/pdf';
 import { normaliseReport } from './lib/normaliseReport';
@@ -350,9 +351,9 @@ export default function App() {
         </aside>
       </div>
 
-      {/* PDF off-screen render target */}
-      <div id="pdf-report-root" className="fixed -left-[10000px] top-0 w-[1200px] space-y-6 bg-[var(--bg-app)] px-6 py-6" aria-hidden="true">
-        {reportSections}
+      {/* PDF off-screen render target — uses dedicated PdfReport with A4-safe light layout */}
+      <div id="pdf-report-root" className="fixed -left-[10000px] top-0 w-[794px]" aria-hidden="true">
+        <PdfReport report={report} />
       </div>
     </div>
   );

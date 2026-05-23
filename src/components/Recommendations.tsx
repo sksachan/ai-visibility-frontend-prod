@@ -27,7 +27,15 @@ export function CmsRecommendations({ report, highlightUrl }: { report: ReportBun
 }
 
 export function PrRecommendations({ report }: { report: ReportBundle }) {
-  return <RecommendationPanel title={`PR & Brand Insights — Grouped opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" />;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">
+        <p className="font-semibold">⚠️ Disclaimer</p>
+        <p className="mt-1">Please review each PR recommendation with your Brand, Content, and Legal teams before executing any external outreach or asset creation.</p>
+      </div>
+      <RecommendationPanel title={`PR & Brand Insights — Grouped opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" />
+    </div>
+  );
 }
 
 function RecommendationPanel({ title, eyebrow, items, type, highlightUrl }: { title: string; eyebrow: string; items: RecommendationModule[]; type: 'cms' | 'pr'; highlightUrl?: string }) {
@@ -113,9 +121,16 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
   const modules = item.copyModules?.length ? item.copyModules.slice(0, 3) : fallbackCmsModules(item);
   const asset = item.advancedGeoAsset;
   const [activeTab, setActiveTab] = useState<'brief' | 'jsonld' | 'facts' | 'faq'>('brief');
-  // Tabs: Brief, JSON-LD, Facts Verified on Page, FAQ (issues #10, #11)
   const tabList = ['brief', 'jsonld', 'facts', 'faq'] as const;
   const tabLabels = { brief: 'Brief', jsonld: 'JSON-LD', facts: 'Facts Verified on Page', faq: 'FAQ' };
+  // Collect direct answer from new schema fields or fallback to advanced asset
+  const directAnswer = item.directAnswer || (asset?.direct_answer_40_words) || '';
+  const primaryQueryId = item.primaryQueryId || item.linkedQueryIds?.[0] || '';
+  const primaryQueryText = item.primaryQueryText || '';
+  // Collect FAQ items from new schema fields, then copyModules, then item.faqItems
+  const allFaqItems = (item.faqItems?.length ? item.faqItems : modules.flatMap((m) => m.faqItems || []));
+  // Intent tags from new schema
+  const intentTags = item.intentTags || [];
   return (
     <div className="mt-4 space-y-3">
       <div className="flex gap-1 overflow-x-auto">
@@ -128,11 +143,26 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
       {activeTab === 'brief' && (
         <>
           {modules.map((module, index) => <CmsCopyBlock key={`${module.moduleId}-${index}`} module={module} item={item} index={index} />)}
-          {asset && asset.direct_answer_40_words && (
+          {/* Direct Answer section — uses new schema fields first, then advanced asset */}
+          {directAnswer && (
             <div className="rounded-[var(--radius-sm)] bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/25 p-3 text-sm">
               <p className="typo-meta text-[var(--accent-blue)]">Direct Answer</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">Query: <span className="font-medium text-[var(--text-secondary)]">{item.linkedQueryIds?.[0] || 'N/A'}</span></p>
-              <p className="mt-2 text-[var(--text-primary)] font-medium">{asset.direct_answer_40_words}</p>
+              {primaryQueryText && <p className="mt-1 text-xs text-[var(--text-secondary)]">{primaryQueryText}</p>}
+              {primaryQueryId && !primaryQueryText && <p className="mt-1 text-xs text-[var(--text-muted)]">Query: <span className="font-medium text-[var(--text-secondary)]">{primaryQueryId}</span></p>}
+              <p className="mt-2 text-[var(--text-primary)] font-medium">{directAnswer}</p>
+            </div>
+          )}
+          {/* Intent tags */}
+          {intentTags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {intentTags.map((tag, i) => <span key={i} className="rounded-full bg-purple-500/10 border border-purple-500/20 px-2 py-1 text-xs text-purple-400">{tag}</span>)}
+            </div>
+          )}
+          {/* Facts missing warning */}
+          {item.factsMissing && item.factsMissing.length > 0 && (
+            <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="typo-meta text-amber-300">Facts Missing — Recommended Copy to Add</p>
+              <ul className="mt-1 space-y-0.5">{item.factsMissing.map((f, i) => <li key={i} className="text-xs text-[var(--text-secondary)]">• {f}</li>)}</ul>
             </div>
           )}
           {item.targetUrl && (
@@ -159,16 +189,24 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
       )}
       {activeTab === 'faq' && (
         <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 space-y-3">
-          <p className="typo-meta text-[var(--text-muted)]">FAQ Suggestions</p>
-          {modules.flatMap((m) => m.faqItems || []).length > 0 ? (
-            modules.flatMap((m) => m.faqItems || []).slice(0, 3).map((faq, i) => (
-              <div key={i} className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
-                <p className="font-semibold text-[var(--text-primary)] text-sm">{faq.question}</p>
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">{faq.answer}</p>
-              </div>
-            ))
+          <p className="typo-meta text-[var(--text-muted)]">FAQ Suggestions (minimum 3 query-aligned)</p>
+          {allFaqItems.length > 0 ? (
+            <>
+              {allFaqItems.slice(0, Math.max(3, allFaqItems.length)).map((faq, i) => (
+                <div key={i} className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
+                  <p className="font-semibold text-[var(--text-primary)] text-sm">{faq.question}</p>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">{faq.answer}</p>
+                  {faq.answer.includes('[Pending fact validation') && (
+                    <p className="mt-1 text-xs text-amber-400">⚠ Recommended FAQ draft pending fact validation</p>
+                  )}
+                </div>
+              ))}
+              {allFaqItems.length < 3 && (
+                <p className="text-xs text-amber-400">⚠ Only {allFaqItems.length} FAQ(s) available. Remaining FAQs are recommended drafts pending fact validation from the next evidence refresh.</p>
+              )}
+            </>
           ) : (
-            <p className="text-sm text-[var(--text-muted)]">FAQ content will be generated by the Bodhi FAQ Generator workflow node. Run a new evidence refresh to populate this section.</p>
+            <p className="text-sm text-amber-400">⚠ Recommended FAQ draft pending fact validation. Run a new evidence refresh to generate query-aligned FAQs from owned page facts.</p>
           )}
         </div>
       )}
@@ -295,7 +333,25 @@ function PrCardBody({ item }: { item: RecommendationModule }) {
           </div>
           <div className="rounded-[var(--radius-sm)] bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/20 p-2"><p className="text-xs text-[var(--accent-blue)] font-semibold">Information Gain Trigger</p><p className="text-sm text-[var(--text-secondary)]">{pack.information_gain_trigger}</p></div>
           <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Suggested Headline</p><p className="text-sm font-semibold text-[var(--text-primary)] break-words">{pack.suggested_headline}</p></div>
+          {pack.example_pitch_headline && pack.example_pitch_headline !== pack.suggested_headline && (
+            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Example Pitch Headline</p><p className="text-sm font-semibold text-[var(--text-primary)] break-words">{pack.example_pitch_headline}</p></div>
+          )}
+          {pack.asset_objective && (
+            <div className="rounded-[var(--radius-sm)] bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/20 p-2"><p className="text-xs text-[var(--accent-blue)] font-semibold">Asset Objective</p><p className="text-sm text-[var(--text-secondary)]">{pack.asset_objective}</p></div>
+          )}
+          {pack.target_publication_angle && (
+            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Target Publication Angle</p><p className="text-sm text-[var(--text-secondary)]">{pack.target_publication_angle}</p></div>
+          )}
+          {pack.proof_gap_addressed && (
+            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Proof Gap Addressed</p><p className="text-sm text-[var(--text-secondary)]">{pack.proof_gap_addressed}</p></div>
+          )}
           <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Briefing Copy</p><p className="text-sm text-[var(--text-secondary)] break-words">{pack.briefing_copy}</p></div>
+          {pack.priority_queries && pack.priority_queries.length > 0 && (
+            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2">
+              <p className="text-xs text-[var(--text-muted)] font-semibold">Priority Queries</p>
+              <ul className="mt-1 space-y-0.5">{pack.priority_queries.slice(0, 5).map((q, i) => <li key={i} className="text-xs text-[var(--text-secondary)]">{i + 1}. {q}</li>)}</ul>
+            </div>
+          )}
           {pack.unique_brand_data_required.length > 0 && (
             <div className="rounded-[var(--radius-sm)] bg-amber-500/10 border border-amber-500/25 p-2">
               <p className="text-xs text-amber-300 font-semibold">Brand Data Required</p>

@@ -7,7 +7,7 @@ const label = (value: string) => value.replaceAll('_', ' ');
 const palette = ['#54a2ff', '#935dff', '#00c758', '#ffea35', '#ff6568', '#9f9f9f', '#54a2ff', '#935dff'];
 
 type XAxisMode = 'sourceType' | 'domain';
-type GraphView = 'scatter' | 'journeyShare';
+type GraphView = 'scatter' | 'journeyShare' | 'sentimentShare';
 
 function sourceCitations(report: ReportBundle): CitationExample[] {
   if (report.sourceLandscape?.sourceCitations?.length) return report.sourceLandscape.sourceCitations;
@@ -158,6 +158,7 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <DarkButton variant={graphView === 'scatter' ? 'primary' : 'default'} onClick={() => setGraphView('scatter')}>Scatter plot</DarkButton>
           <DarkButton variant={graphView === 'journeyShare' ? 'primary' : 'default'} onClick={() => setGraphView('journeyShare')}>Source type % by brand topics</DarkButton>
+          <DarkButton variant={graphView === 'sentimentShare' ? 'primary' : 'default'} onClick={() => setGraphView('sentimentShare')}>Sentiment % by brand topics</DarkButton>
           {graphView === 'scatter' && (
             <>
               <span className="text-xs text-[var(--text-muted)] mx-1">|</span>
@@ -253,6 +254,51 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
             ) : <Empty>No journey category data available. Run analysis with query workbench data.</Empty>}
           </div>
         )}
+
+        {graphView === 'sentimentShare' && (() => {
+          // Build sentiment data: axes = sentiment types, lines = journey categories
+          const sentimentTypes = ['positive', 'neutral', 'negative', 'mixed'] as const;
+          const sentimentPalette = ['#00c758', '#9f9f9f', '#ff6568', '#ffea35'];
+          const journeySentiment: Record<string, Record<string, number>> = {};
+          (report.queryWorkbench ?? []).forEach((q) => {
+            const journey = q.journey_category || 'Unclassified';
+            if (journey === 'Unclassified') return;
+            const vis = q.current_ai_visibility;
+            if (!vis?.brand_mentioned) return;
+            if (!journeySentiment[journey]) journeySentiment[journey] = { positive: 0, neutral: 0, negative: 0, mixed: 0, total: 0 };
+            const s = vis.brand_sentiment || 'neutral';
+            if (s in journeySentiment[journey]) journeySentiment[journey][s]++;
+            journeySentiment[journey].total++;
+          });
+          const journeys = Object.keys(journeySentiment).filter(j => journeySentiment[j].total > 0).slice(0, 8);
+          if (!journeys.length) return <div className="h-[28rem] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 flex items-center justify-center"><Empty>No brand sentiment data available. Brand must be mentioned in AI answers for sentiment analysis.</Empty></div>;
+          const chartData = sentimentTypes.map((st) => {
+            const row: Record<string, unknown> = { sentiment: st.charAt(0).toUpperCase() + st.slice(1) };
+            journeys.forEach((j) => {
+              const total = journeySentiment[j].total || 1;
+              row[j] = Math.round((journeySentiment[j][st] / total) * 100 * 10) / 10;
+            });
+            return row;
+          });
+          return (
+            <div className="h-[28rem] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
+              <p className="mb-2 text-xs text-[var(--text-muted)]">Brand sentiment share (%) by journey categories. Each bar segment shows positive/neutral/negative/mixed share.</p>
+              <ResponsiveContainer width="100%" height="95%">
+                <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+                  <XAxis dataKey="sentiment" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fill: 'var(--text-muted)' }} />
+                  <Tooltip content={({ active, payload, label: sentLabel }) => {
+                    if (!active || !payload?.length) return null;
+                    return (<div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3 text-sm shadow-lg"><p className="font-semibold text-[var(--text-primary)] mb-1">{sentLabel}</p>{payload.map((p) => (<p key={String(p.dataKey)} className="text-[var(--text-secondary)]"><span style={{ color: p.color }}>{"\u25CF"}</span> {String(p.name)}: {p.value}%</p>))}</div>);
+                  }} />
+                  {journeys.map((j, i) => <Bar key={j} dataKey={j} name={j} fill={palette[i % palette.length]} stackId="sentiment" />)}
+                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-secondary)' }} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          );
+        })()}
       </WorkspacePanel>
 
       <WorkspacePanel>

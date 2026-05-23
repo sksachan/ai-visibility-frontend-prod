@@ -179,6 +179,12 @@ export interface AdvancedPrAssetPack {
   suggested_headline: string;
   briefing_copy: string;
   validation_flags: string[];
+  asset_objective?: string;
+  target_publication_angle?: string;
+  required_brand_data?: string[];
+  proof_gap_addressed?: string;
+  example_pitch_headline?: string;
+  priority_queries?: string[];
 }
 
 export interface RecommendationModule {
@@ -197,6 +203,13 @@ export interface RecommendationModule {
   faqItems?: Array<{ question: string; answer: string }>;
   validationRequired?: string[];
   claimsSafetyNotes?: string[];
+  primaryQueryId?: string;
+  primaryQueryText?: string;
+  directAnswer?: string;
+  factsUsed?: FactUsed[];
+  factsMissing?: string[];
+  jsonLdTags?: string[];
+  intentTags?: string[];
   whyItMatters?: string;
   evidenceBasis?: string;
   targetSourceTypes?: string[];
@@ -246,6 +259,10 @@ export interface QueryWorkbenchItem {
     competitors?: string[];
     competitor_citation_count?: number;
     top_citations?: CitationExample[];
+    brand_mentioned?: boolean;
+    brand_sentiment?: 'positive' | 'neutral' | 'negative' | 'mixed' | 'not_applicable';
+    brand_sentiment_score?: number | null;
+    sentiment_evidence?: string;
   };
   mapped_owned_urls?: Array<{ rank?: number; url: string; title?: string; mapping_score?: number; current_geo_score_120?: number; geo_gaps?: string[]; geo_dimensions?: Record<string, number> }>;
   external_top3_benchmark?: CitationExample[];
