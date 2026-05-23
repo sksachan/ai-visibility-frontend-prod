@@ -107,7 +107,7 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
                   }}
                 />
                 <Bar dataKey={chartMode === 'percentage' ? 'percentage' : 'count'} radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey={chartMode === 'percentage' ? 'percentage' : 'count'} position="top" formatter={(v: number) => chartMode === 'percentage' ? `${v}%` : v} style={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                  <LabelList dataKey={chartMode === 'percentage' ? 'percentage' : 'count'} position="top" formatter={((v: string | number | boolean | null | undefined) => v == null || v === false ? '' : chartMode === 'percentage' ? `${v}%` : v) as (label: string | number | boolean | null | undefined) => string | number | boolean | null | undefined} style={{ fill: 'var(--text-muted)', fontSize: 11 }} />
                   {chartData.map((d, i) => <Cell key={d.sourceType} fill={palette[i % palette.length]} />)}
                 </Bar>
               </BarChart>
