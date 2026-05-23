@@ -1,103 +1,148 @@
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import type { ReportBundle } from '../types/report';
 
 /**
- * Export the current report to PDF using html2canvas + jsPDF.
- *
- * html2canvas does not support modern CSS color functions like oklab() / oklch().
- * We patch these before capture and restore afterwards.
+ * Regex matching modern CSS color functions that html2canvas cannot parse.
+ * Covers oklab(...), oklch(...), color-mix(...), and lab/lch variants.
  */
+const UNSUPPORTED_COLOR_RE = /\b(oklab|oklch|color-mix|lab|lch)\s*\(/i;
+
+/** CSS properties that may contain color values. */
+const COLOR_PROPS = [
+  'color',
+  'backgroundColor',
+  'borderColor',
+  'borderTopColor',
+  'borderRightColor',
+  'borderBottomColor',
+  'borderLeftColor',
+  'outlineColor',
+  'fill',
+  'stroke',
+  'boxShadow',
+  'textDecorationColor',
+  'caretColor',
+  'columnRuleColor',
+] as const;
+
+/**
+ * Replace any unsupported color function value with a safe fallback.
+ * For box-shadow we strip the entire value; for other props we use a
+ * neutral color that preserves readability on the white PDF background.
+ */
+function safeFallback(prop: string, _value: string): string {
+  if (prop === 'boxShadow') return 'none';
+  if (prop === 'color' || prop === 'fill') return '#1e293b'; // slate-800
+  if (prop === 'stroke') return '#334155'; // slate-700
+  return 'transparent';
+}
+
+/**
+ * Walk every element (including SVG nodes) inside a cloned document and
+ * replace any computed color value that uses oklab/oklch/color-mix with
+ * a plain hex/rgb fallback so html2canvas can parse it.
+ */
+function sanitizeColors(clonedDoc: Document): void {
+  const win = clonedDoc.defaultView;
+  if (!win) return;
+
+  // Select ALL elements including SVG children
+  const allElements = clonedDoc.querySelectorAll('*');
+  allElements.forEach((el) => {
+    // Must be an Element that supports style — covers HTMLElement and SVGElement
+    if (!('style' in el)) return;
+    const htmlEl = el as HTMLElement | SVGElement;
+
+    try {
+      const computed = win.getComputedStyle(htmlEl);
+      for (const prop of COLOR_PROPS) {
+        const value = computed.getPropertyValue(
+          // Convert camelCase to kebab-case for getPropertyValue
+          prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)
+        );
+        if (value && UNSUPPORTED_COLOR_RE.test(value)) {
+          (htmlEl as HTMLElement).style.setProperty(
+            prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`),
+            safeFallback(prop, value),
+            'important'
+          );
+        }
+      }
+    } catch {
+      // getComputedStyle can throw on detached nodes — skip silently
+    }
+  });
+}
+
+/**
+ * Apply export-safe overrides to the #pdf-report-root container.
+ * Strips Tailwind opacity color classes (e.g. bg-emerald-500/10) by
+ * forcing plain hex/rgb colors on the root and key child elements.
+ */
+function applyExportSafeStyles(root: HTMLElement): void {
+  root.style.setProperty('background-color', '#ffffff', 'important');
+  root.style.setProperty('color', '#0f172a', 'important');
+
+  // Force all direct section wrappers to white bg
+  root.querySelectorAll('[class*="bg-"]').forEach((el) => {
+    const htmlEl = el as HTMLElement;
+    try {
+      const bg = getComputedStyle(htmlEl).backgroundColor;
+      if (UNSUPPORTED_COLOR_RE.test(bg) || bg.includes('color-mix')) {
+        htmlEl.style.setProperty('background-color', 'transparent', 'important');
+      }
+    } catch { /* skip */ }
+  });
+}
+
 export async function exportReportToPdf(report: ReportBundle, fileName?: string): Promise<void> {
-  const target = document.getElementById('pdf-report-root');
-  if (!target) {
-    alert('PDF export container not found. Please try again.');
-    return;
+  const root = document.getElementById('pdf-report-root');
+  if (!root) {
+    throw new Error('PDF report root element (#pdf-report-root) not found.');
   }
 
+  // Temporarily make the off-screen container visible for capture
+  const origLeft = root.style.left;
+  const origPosition = root.style.position;
+  root.style.left = '0';
+  root.style.position = 'absolute';
+  applyExportSafeStyles(root);
+
   try {
-    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-    ]);
-
-    // Patch oklab/oklch colors that html2canvas cannot parse
-    const patched: Array<{ el: HTMLElement; prop: string; orig: string }> = [];
-    const oklabRe = /oklch?\s*\(/i;
-    const props = ['color', 'background-color', 'border-color', 'outline-color', 'fill', 'stroke'];
-
-    const walk = (root: Element) => {
-      root.querySelectorAll('*').forEach((node) => {
-        if (!(node instanceof HTMLElement)) return;
-        const cs = window.getComputedStyle(node);
-        props.forEach((p) => {
-          const val = cs.getPropertyValue(p);
-          if (val && oklabRe.test(val)) {
-            patched.push({ el: node, prop: p, orig: node.style.getPropertyValue(p) });
-            const fb = p === 'color' ? '#edf2f5' : p === 'background-color' ? '#171717' : '#232323';
-            node.style.setProperty(p, fb, 'important');
-          }
-        });
-      });
-    };
-    walk(target);
-
-    // Also patch the target element itself
-    const tcs = window.getComputedStyle(target);
-    props.forEach((p) => {
-      const val = tcs.getPropertyValue(p);
-      if (val && oklabRe.test(val)) {
-        patched.push({ el: target, prop: p, orig: target.style.getPropertyValue(p) });
-        target.style.setProperty(p, p === 'background-color' ? '#000000' : '#edf2f5', 'important');
-      }
-    });
-
-    const canvas = await html2canvas(target, {
-      scale: 1.5,
+    const canvas = await html2canvas(root, {
+      scale: 2,
       useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
       logging: false,
-      backgroundColor: '#000000',
-      windowWidth: 1200,
       onclone: (clonedDoc: Document) => {
-        clonedDoc.body.style.backgroundColor = '#000000';
-        clonedDoc.body.style.color = '#edf2f5';
-        // Patch cloned doc too
-        walk(clonedDoc.body);
+        // Sanitize ALL elements in the cloned document (HTML + SVG)
+        sanitizeColors(clonedDoc);
+
+        // Also apply export-safe styles to the cloned root
+        const clonedRoot = clonedDoc.getElementById('pdf-report-root');
+        if (clonedRoot) {
+          applyExportSafeStyles(clonedRoot);
+          clonedRoot.style.left = '0';
+          clonedRoot.style.position = 'relative';
+        }
       },
     });
 
-    // Restore patched elements
-    patched.forEach(({ el, prop, orig }) => {
-      if (orig) el.style.setProperty(prop, orig);
-      else el.style.removeProperty(prop);
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'px',
+      format: [canvas.width, canvas.height],
     });
+    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
 
-    const imgW = 210;
-    const imgH = (canvas.height * imgW) / canvas.width;
-    const pageH = 297;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-    let pos = 0;
-    let rem = imgH;
-
-    while (rem > 0) {
-      if (pos > 0) pdf.addPage();
-      const sliceH = Math.min(rem, pageH);
-      const sc = document.createElement('canvas');
-      sc.width = canvas.width;
-      sc.height = Math.round((sliceH / imgH) * canvas.height);
-      const ctx = sc.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(canvas, 0, Math.round((pos / imgH) * canvas.height), canvas.width, sc.height, 0, 0, sc.width, sc.height);
-      }
-      pdf.addImage(sc.toDataURL('image/png'), 'PNG', 0, 0, imgW, sliceH);
-      pos += pageH;
-      rem -= pageH;
-    }
-
-    const name = fileName || `${report.brand}_${report.market}_${report.runId}_report.pdf`.replace(/\s+/g, '_');
+    const name = fileName || `${report.brand}_${report.market}_${report.runId}_ai_visibility_report.pdf`.replaceAll(' ', '_');
     pdf.save(name);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('PDF export error:', msg);
-    alert(`PDF export failed: ${msg}`);
+  } finally {
+    // Restore off-screen positioning
+    root.style.left = origLeft;
+    root.style.position = origPosition;
   }
 }

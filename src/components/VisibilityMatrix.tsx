@@ -70,29 +70,48 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
   const scatterData = xAxisMode === 'sourceType' ? scatterByType : scatterByDomain;
 
   // Radar chart data: source type citation % by journey category
-  // Axes = % of citation by source type, Lines = journey categories
+  // Axes = normalized source types (top 6-8 by total citations), Lines = journey categories
   const radarShareData = useMemo(() => {
     const journeySourceCounts: Record<string, Record<string, number>> = {};
-    const allSourceTypes = new Set<string>();
+    const globalSourceCounts: Record<string, number> = {};
 
     (report.queryWorkbench ?? []).forEach((q) => {
-      const journey = q.journey_category || 'Unclassified';
+      // Normalize journey from multiple possible field names (snake_case and camelCase)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const qAny = q as any;
+      const journey: string = qAny.journey_category || qAny.journeyCategory || qAny.journey || 'Unclassified';
       if (journey === 'Unclassified') return;
+
       const cites = [...(q.current_ai_visibility?.top_citations ?? []), ...(q.external_top3_benchmark ?? [])];
       cites.forEach((c) => {
-        const st = label(c.sourceType || 'other');
-        allSourceTypes.add(st);
+        // Normalize source type from multiple possible field names (snake_case and camelCase)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const cAny = c as any;
+        const raw: string = cAny.sourceType || cAny.source_type || cAny.source_category || 'other';
+        const st = label(raw);
+        globalSourceCounts[st] = (globalSourceCounts[st] || 0) + 1;
         if (!journeySourceCounts[journey]) journeySourceCounts[journey] = {};
         journeySourceCounts[journey][st] = (journeySourceCounts[journey][st] || 0) + 1;
       });
     });
 
-    const sourceTypes = Array.from(allSourceTypes).slice(0, 8);
-    const journeys = Object.keys(journeySourceCounts).slice(0, 8);
+    // Limit to top 6-8 source types by total citations so the chart stays readable
+    const sourceTypes = Object.entries(globalSourceCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([st]) => st);
+    const journeys = Object.keys(journeySourceCounts)
+      .sort((a, b) => {
+        const totalA = Object.values(journeySourceCounts[a]).reduce((s, v) => s + v, 0);
+        const totalB = Object.values(journeySourceCounts[b]).reduce((s, v) => s + v, 0);
+        return totalB - totalA;
+      })
+      .slice(0, 8);
 
     if (!sourceTypes.length || !journeys.length) return { chartData: [] as Record<string, unknown>[], journeyNames: [] as string[] };
 
     // Each row = a source type (axis), each journey = a radar line
+    // Values = % of citations within that journey
     const chartData = sourceTypes.map((st) => {
       const row: Record<string, unknown> = { sourceType: st };
       journeys.forEach((journey) => {

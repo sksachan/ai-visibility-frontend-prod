@@ -66,30 +66,67 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
     });
   }, [filtered, report.ownedPages]);
 
+  // Build a lookup from queryWorkbench by query_id and query text to enrich owned page topics
+  const qwbLookup = useMemo(() => {
+    const byId: Record<string, string> = {};
+    const byText: Record<string, string> = {};
+    (report.queryWorkbench ?? []).forEach((q) => {
+      const journey = q.journey_category || '';
+      if (journey && journey !== 'Unclassified') {
+        if (q.query_id) byId[q.query_id] = journey;
+        if (q.query) byText[q.query.toLowerCase().trim()] = journey;
+      }
+    });
+    return { byId, byText };
+  }, [report.queryWorkbench]);
+
+  // Resolve journey category for a page using multiple fallback strategies
+  function resolvePageJourney(p: OwnedPage): string {
+    // 1. Direct journeyCategory on the page
+    if (p.journeyCategory && p.journeyCategory !== 'Unclassified') return p.journeyCategory;
+    // 2. Match via relatedQueries query_id
+    for (const rq of p.relatedQueries) {
+      if (rq.id && qwbLookup.byId[rq.id]) return qwbLookup.byId[rq.id];
+    }
+    // 3. Match via relatedQueries query text
+    for (const rq of p.relatedQueries) {
+      if (rq.query) {
+        const key = rq.query.toLowerCase().trim();
+        if (qwbLookup.byText[key]) return qwbLookup.byText[key];
+      }
+    }
+    // 4. Match via mappedQuery text
+    if (p.mappedQuery) {
+      const key = p.mappedQuery.toLowerCase().trim();
+      if (qwbLookup.byText[key]) return qwbLookup.byText[key];
+    }
+    return 'Unclassified';
+  }
+
   // Radar chart data: avg of 6 dimensions by journey category (brand topics)
   const radarData = useMemo(() => {
     const pages = filtered.length ? filtered : report.ownedPages;
-    // Group pages by journey category
+    // Group pages by enriched journey category
     const topicMap: Record<string, { count: number; dims: Record<string, number> }> = {};
     pages.forEach((p) => {
-      const topics = new Set<string>();
-      p.relatedQueries.forEach(() => {
-        topics.add(p.journeyCategory || 'Unclassified');
-      });
-      if (!topics.size) topics.add(p.journeyCategory || 'Unclassified');
-      topics.forEach((topic) => {
-        if (!topicMap[topic]) topicMap[topic] = { count: 0, dims: {} };
-        topicMap[topic].count++;
-        dimensionKeys.forEach((k) => {
-          topicMap[topic].dims[k] = (topicMap[topic].dims[k] || 0) + (Number(p[k]) || 0);
-        });
+      const journey = resolvePageJourney(p);
+      if (!topicMap[journey]) topicMap[journey] = { count: 0, dims: {} };
+      topicMap[journey].count++;
+      dimensionKeys.forEach((k) => {
+        topicMap[journey].dims[k] = (topicMap[journey].dims[k] || 0) + (Number(p[k]) || 0);
       });
     });
 
-    // Get journey categories (exclude Unclassified)
-    const journeys = Object.entries(topicMap)
+    // Get journey categories — include Unclassified only if it's the ONLY category
+    let journeys = Object.entries(topicMap)
       .filter(([t]) => t && t !== 'Unclassified')
+      .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 8);
+
+    // If no non-Unclassified journeys found, include Unclassified as fallback
+    if (!journeys.length && topicMap['Unclassified']) {
+      journeys = [['Unclassified', topicMap['Unclassified']]];
+    }
 
     if (!journeys.length) return { chartData: [] as Record<string, unknown>[], journeyNames: [] as string[] };
 
@@ -103,7 +140,8 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
     });
 
     return { chartData, journeyNames: journeys.map(([t]) => t) };
-  }, [filtered, report.ownedPages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, report.ownedPages, qwbLookup]);
 
   function toggle(key: SortKey) {
     setSort((current) => current.key === key ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' });
