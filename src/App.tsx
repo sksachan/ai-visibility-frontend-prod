@@ -18,16 +18,24 @@ import { mockReport } from './data/mockReport';
 type Tab = 'executive' | 'workbench' | 'matrix' | 'owned' | 'cms' | 'pr' | 'actions' | 'runs' | 'appendix' | 'refresh';
 type Notice = { tone: 'success' | 'warning' | 'error'; message: string } | null;
 
-const tabs: Array<{ id: Tab; label: string }> = [
-  { id: 'executive', label: 'Executive report' },
-  { id: 'workbench', label: 'Query workbench' },
-  { id: 'matrix', label: 'Visibility & sources' },
-  { id: 'owned', label: 'Owned URLs' },
-  { id: 'cms', label: 'CMS' },
-  { id: 'pr', label: 'PR' },
-  { id: 'actions', label: 'Action checklist' },
-  { id: 'refresh', label: 'Refresh Evidence' }
+type NavGroup = { label: string; items: Array<{ id: Tab; label: string }> };
+
+const navGroups: NavGroup[] = [
+  { label: '', items: [{ id: 'executive', label: 'Executive Report' }] },
+  { label: 'AEO Insights', items: [
+    { id: 'workbench', label: 'Query Workbench' },
+    { id: 'matrix', label: 'Visibility & Sources' },
+  ]},
+  { label: '', items: [
+    { id: 'owned', label: 'GEO Insights' },
+    { id: 'cms', label: 'Content Insights' },
+    { id: 'pr', label: 'PR & Brand Insights' },
+    { id: 'actions', label: 'Action Checklist' },
+  ]},
+  { label: '', items: [{ id: 'refresh', label: 'Refresh Evidence' }] },
 ];
+
+const allTabs = navGroups.flatMap((g) => g.items);
 
 function parseMessage(report: ReportBundle, source: string) {
   return `${source}. Parsed ${report.queries.length} queries, ${report.ownedPages.length} owned pages, ${report.cmsModules.length} CMS modules, ${report.prOpportunities.length} PR opportunities and ${report.actionChecklist.length} actions.`;
@@ -143,45 +151,87 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-50 pb-16">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur no-print">
-        <div className="mx-auto flex max-w-7xl items-start justify-between gap-4 px-4 py-4">
-          <div className="min-w-[260px] flex-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">AI Brand Visibility</p>
-            <h1 className="text-xl font-semibold text-slate-950">AEO/GEO Intelligence Dashboard</h1>
-            {refreshStatus?.active && (
-              <p className="mt-1 text-xs font-semibold text-amber-700">Refresh evidence is running. Showing latest successful report until completion.</p>
-            )}
-          </div>
-          <button onClick={() => setActionMenuOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" aria-expanded={actionMenuOpen} aria-controls="dashboard-action-menu">
-            {actionMenuOpen ? <X size={16} /> : <Menu size={16} />} Menu
-          </button>
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 pb-16 flex">
+      {/* Vertical left sidebar navigation (issue #19) */}
+      <aside className="sticky top-0 z-30 hidden h-screen w-56 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex no-print overflow-y-auto">
+        <div className="px-4 py-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">AI Brand Visibility</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900">Intelligence</p>
         </div>
-        {actionMenuOpen && (
-          <div id="dashboard-action-menu" className="mx-auto max-w-7xl px-4 pb-3">
-            <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:max-w-sm sm:ml-auto">
-              {actionButtons}
+        <nav className="flex-1 space-y-1 px-2 pb-4">
+          {navGroups.map((group, gi) => (
+            <div key={gi}>
+              {group.label && <p className="mt-4 mb-1 px-2 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">{group.label}</p>}
+              {group.items.map((tab) => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          ))}
+          <div className="mt-4 border-t border-slate-100 pt-3 space-y-1">
+            <button onClick={() => { void loadLatest(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100">
+              <RefreshCcw size={14} /> {loading ? 'Loading...' : 'Load latest'}
+            </button>
+            <button onClick={() => setActiveTab('runs' as Tab)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100">
+              <History size={14} /> Previous runs
+            </button>
+            <button onClick={() => setActiveTab('appendix' as Tab)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100">
+              <BookOpen size={14} /> Documentation
+            </button>
+            <button onClick={() => fileRef.current?.click()} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100">
+              <Upload size={14} /> Upload JSON
+            </button>
+            <input ref={fileRef} className="hidden" type="file" accept="application/json,.json" onChange={(e) => void onUpload(e.target.files?.[0])} />
+            <button onClick={() => void exportReportToPdf(report, fileName)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100">
+              <Download size={14} /> Download PDF
+            </button>
+          </div>
+        </nav>
+      </aside>
+
+      {/* Main content area */}
+      <div className="flex-1 min-w-0">
+        {/* Mobile/tablet top header */}
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur no-print lg:border-b-0">
+          <div className="flex items-start justify-between gap-4 px-4 py-4">
+            <div className="min-w-[200px] flex-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">AI Brand Visibility Intelligence</p>
+              <h1 className="text-xl font-semibold text-slate-950 lg:hidden">AI Brand Visibility Intelligence</h1>
+              {refreshStatus?.active && (
+                <p className="mt-1 text-xs font-semibold text-amber-700">Refresh evidence is running. Showing latest successful report until completion.</p>
+              )}
+            </div>
+            <button onClick={() => setActionMenuOpen((open) => !open)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 lg:hidden" aria-expanded={actionMenuOpen} aria-controls="dashboard-action-menu">
+              {actionMenuOpen ? <X size={16} /> : <Menu size={16} />} Menu
+            </button>
+          </div>
+          {actionMenuOpen && (
+            <div id="dashboard-action-menu" className="px-4 pb-3 lg:hidden">
+              <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg sm:max-w-sm sm:ml-auto">
+                {actionButtons}
+              </div>
+            </div>
+          )}
+          {/* Mobile horizontal tab bar */}
+          <nav className="hide-scrollbar flex gap-2 overflow-x-auto px-4 pb-3 lg:hidden">
+            {allTabs.map((tab) => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold ${activeTab === tab.id ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </header>
+
+        {notice && (
+          <div className="px-4 pt-4 no-print">
+            <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${notice.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : notice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
+              {notice.message}
             </div>
           </div>
         )}
-        <nav className="hide-scrollbar mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3">
-          {tabs.map((tab) => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold ${activeTab === tab.id ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-700'}`}>
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-      </header>
 
-      {notice && (
-        <div className="mx-auto max-w-7xl px-4 pt-4 no-print">
-          <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${notice.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : notice.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
-            {notice.message}
-          </div>
-        </div>
-      )}
-
-      <main id="report-root" className="mx-auto max-w-7xl space-y-6 px-4 py-6">
+        <main id="report-root" className="space-y-6 px-4 py-6">
         {activeTab === 'executive' && <ExecutiveReport report={report} />}
         {activeTab === 'workbench' && <QueryWorkbench report={report} />}
         {activeTab === 'matrix' && <><VisibilityMatrix report={report} /><Trend report={report} /></>}
@@ -194,9 +244,10 @@ export default function App() {
         {activeTab === 'refresh' && <RefreshPanel brand={report.brand} market={report.market} />}
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-3 text-xs font-medium text-slate-600 shadow-sm no-print">
-        <div className="mx-auto max-w-7xl">{footerMessage}</div>
-      </footer>
+        <footer className="border-t border-slate-200 bg-white/95 px-4 py-3 text-xs font-medium text-slate-600 shadow-sm no-print mt-6">
+          {footerMessage}
+        </footer>
+      </div>
 
       <div id="pdf-report-root" className="fixed -left-[10000px] top-0 w-[1200px] space-y-6 bg-slate-50 px-6 py-6" aria-hidden="true">
         {reportSections}

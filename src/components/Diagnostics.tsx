@@ -85,7 +85,6 @@ function OwnedTable({ pages, cmsUrls, sort, onSort, onOpenCms }: { pages: OwnedP
         <thead>
           <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
             <th className="px-3 py-3"><SortHeader label="Owned URL" sortKey="url" sort={sort} onSort={onSort} /></th>
-            <th className="px-3 py-3"><SortHeader label="Journey" sortKey="journeyCategory" sort={sort} onSort={onSort} /></th>
             <th className="px-3 py-3"><SortHeader label="Score /120" sortKey="geoScore" sort={sort} onSort={onSort} /></th>
             <th className="px-3 py-3"><SortHeader label="Clarity" sortKey="clarity" sort={sort} onSort={onSort} /></th>
             <th className="px-3 py-3"><SortHeader label="Depth" sortKey="semanticDepth" sort={sort} onSort={onSort} /></th>
@@ -101,7 +100,6 @@ function OwnedTable({ pages, cmsUrls, sort, onSort, onOpenCms }: { pages: OwnedP
           {pages.map((page) => (
             <tr key={page.url} className="align-top">
               <td className="max-w-sm px-3 py-4 font-medium text-slate-950"><p className="break-all">{page.url}</p>{page.title && <p className="mt-1 text-xs text-slate-500">{page.title}</p>}<p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">{page.queryMapped || cmsUrls.has(normaliseUrl(page.url)) ? 'Mapped/CMS' : 'Inventory only'} · {page.inventorySource || 'sitemap_inventory'}</p></td>
-              <td className="max-w-xs px-3 py-4 text-slate-600">{page.journeyCategory}</td>
               <td className="px-3 py-4"><p className="font-semibold text-slate-950">{page.geoScore}</p><ScoreMethod page={page} /></td><td className="px-3 py-4">{page.clarity}</td><td className="px-3 py-4">{page.semanticDepth}</td><td className="px-3 py-4">{page.structure}</td><td className="px-3 py-4">{page.evidence}</td><td className="px-3 py-4">{page.freshness}</td><td className="px-3 py-4">{page.faqReadiness ?? 0}</td><td className="px-3 py-4">{page.relatedQueries.length}</td>
               <td className="px-3 py-4"><TechnicalSignals page={page} /></td>
               <td className="px-3 py-4">{cmsUrls.has(normaliseUrl(page.url)) ? <button onClick={() => onOpenCms?.(page.url)} className="rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white">Open CMS</button> : <span className="text-xs text-slate-400">No CMS copy</span>}</td>
