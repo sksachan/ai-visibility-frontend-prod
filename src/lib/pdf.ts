@@ -1,86 +1,116 @@
 import type { ReportBundle } from '../types/report';
 
-export async function exportReportToPdf(_report: ReportBundle, fileName: string): Promise<void> {
-  const root = document.getElementById('pdf-report-root');
-  if (!root) {
-    throw new Error('PDF render target (#pdf-report-root) not found in the DOM.');
-  }
+/**
+ * Export the current report to PDF using html2canvas + jsPDF.
+ *
+ * The oklab/oklch colour functions used in modern CSS are NOT supported by
+ * html2canvas 1.x. To work around this we:
+ *  1. Clone the target DOM subtree into an off-screen container.
+ *  2. Walk every element and inline-replace any computed colour that uses
+ *     oklab/oklch with a safe fallback (rgb or hex).
+ *  3. Render the sanitised clone with html2canvas.
+ *  4. Remove the clone.
+ */
+export async function exportReportToPdf(report: ReportBundle, fileName?: string): Promise<void> {
+  const { default: html2canvas } = await import('html2canvas');
+  const { jsPDF } = await import('jspdf');
 
-  const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-    import('html2canvas'),
-    import('jspdf'),
-  ]);
+  const source = document.getElementById('pdf-report-root');
+  if (!source) throw new Error('PDF report root element not found.');
 
-  const patchedElements: Array<{ el: HTMLElement; prop: string; original: string }> = [];
-  const problematicColorPattern = /oklab|oklch|color-mix|color\(/i;
-  const colorProperties = ['color', 'background-color', 'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'outline-color', 'box-shadow', 'text-shadow', 'text-decoration-color'];
+  // ── 1. Clone into a visible but off-screen container ──────────────────
+  const clone = source.cloneNode(true) as HTMLElement;
+  clone.id = 'pdf-clone-root';
+  Object.assign(clone.style, {
+    position: 'fixed',
+    left: '-20000px',
+    top: '0',
+    width: '1200px',
+    zIndex: '-9999',
+    background: '#ffffff',
+    color: '#000000',
+  });
+  document.body.appendChild(clone);
 
-  try {
-    const allElements = root.querySelectorAll('*');
-    allElements.forEach((el) => {
-      if (!(el instanceof HTMLElement)) return;
-      const computed = window.getComputedStyle(el);
-      for (const prop of colorProperties) {
-        const value = computed.getPropertyValue(prop);
-        if (value && problematicColorPattern.test(value)) {
-          patchedElements.push({ el, prop, original: el.style.getPropertyValue(prop) });
-          if (prop === 'color' || prop === 'text-decoration-color') {
-            el.style.setProperty(prop, '#edf2f5', 'important');
-          } else if (prop.includes('background')) {
-            el.style.setProperty(prop, '#171717', 'important');
-          } else if (prop.includes('border') || prop === 'outline-color') {
-            el.style.setProperty(prop, '#232323', 'important');
-          } else {
-            el.style.setProperty(prop, 'transparent', 'important');
-          }
+  // ── 2. Sanitise colours that html2canvas cannot parse ─────────────────
+  const UNSUPPORTED_RE = /\b(oklab|oklch|color-mix|lch|lab)\s*\(/i;
+
+  function sanitiseElement(el: HTMLElement) {
+    const style = window.getComputedStyle(el);
+    const props = ['color', 'background-color', 'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'outline-color', 'box-shadow', 'text-shadow', 'fill', 'stroke'];
+    for (const prop of props) {
+      const val = style.getPropertyValue(prop);
+      if (val && UNSUPPORTED_RE.test(val)) {
+        // Replace with a safe fallback
+        if (prop === 'background-color') {
+          el.style.backgroundColor = '#ffffff';
+        } else if (prop === 'color') {
+          el.style.color = '#000000';
+        } else if (prop.includes('border')) {
+          el.style.setProperty(prop, '#cccccc');
+        } else if (prop === 'box-shadow' || prop === 'text-shadow') {
+          el.style.setProperty(prop, 'none');
+        } else {
+          el.style.setProperty(prop, 'transparent');
         }
       }
-    });
+    }
+    // Also override CSS variables that may resolve to oklab
+    el.style.setProperty('--bg-app', '#ffffff');
+    el.style.setProperty('--bg-surface', '#f8f9fa');
+    el.style.setProperty('--bg-panel', '#ffffff');
+    el.style.setProperty('--bg-card', '#ffffff');
+    el.style.setProperty('--bg-card-hover', '#f0f0f0');
+    el.style.setProperty('--border-subtle', '#e0e0e0');
+    el.style.setProperty('--border-strong', '#cccccc');
+    el.style.setProperty('--text-primary', '#111111');
+    el.style.setProperty('--text-secondary', '#555555');
+    el.style.setProperty('--text-muted', '#888888');
+  }
 
-    const origLeft = root.style.left;
-    root.style.left = '0';
-    root.style.position = 'absolute';
-    root.style.zIndex = '-1';
+  // Walk all elements in the clone
+  sanitiseElement(clone);
+  const allElements = clone.querySelectorAll('*');
+  allElements.forEach((child) => {
+    if (child instanceof HTMLElement) sanitiseElement(child);
+  });
 
-    const canvas = await html2canvas(root, {
-      scale: 1.5,
+  // ── 3. Render with html2canvas ────────────────────────────────────────
+  try {
+    const canvas = await html2canvas(clone, {
+      scale: 2,
       useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
       logging: false,
-      backgroundColor: '#000000',
+      width: 1200,
       windowWidth: 1200,
     });
 
-    root.style.left = origLeft;
-    root.style.position = 'fixed';
-    root.style.zIndex = '';
-
-    const imgWidth = 210;
+    // ── 4. Build PDF ──────────────────────────────────────────────────────
+    const imgWidth = 210; // A4 mm
     const pageHeight = 297;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
 
     let heightLeft = imgHeight;
     let position = 0;
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
 
     pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
 
     while (heightLeft > 0) {
-      position = -(imgHeight - heightLeft);
+      position -= pageHeight;
       pdf.addPage();
       pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
     }
 
-    pdf.save(fileName);
+    const name = fileName || `${report.brand}_${report.market}_${report.runId}_ai_visibility_report.pdf`.replaceAll(' ', '_');
+    pdf.save(name);
   } finally {
-    for (const { el, prop, original } of patchedElements) {
-      if (original) {
-        el.style.setProperty(prop, original);
-      } else {
-        el.style.removeProperty(prop);
-      }
-    }
+    // ── 5. Cleanup ────────────────────────────────────────────────────────
+    document.body.removeChild(clone);
   }
 }

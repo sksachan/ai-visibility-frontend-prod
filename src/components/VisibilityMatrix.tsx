@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
 import type { CitationExample, ReportBundle } from '../types/report';
 import { WorkspacePanel, SectionHeader, DarkButton } from './ui';
 
@@ -69,13 +69,15 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
 
   const scatterData = xAxisMode === 'sourceType' ? scatterByType : scatterByDomain;
 
-  // Journey category share data: source type citation % by journey category
-  const journeyShareData = useMemo(() => {
+  // Radar chart data: source type citation % by journey category
+  // Axes = % of citation by source type, Lines = journey categories
+  const radarShareData = useMemo(() => {
     const journeySourceCounts: Record<string, Record<string, number>> = {};
     const allSourceTypes = new Set<string>();
-    // Use query workbench to get journey categories
+
     (report.queryWorkbench ?? []).forEach((q) => {
       const journey = q.journey_category || 'Unclassified';
+      if (journey === 'Unclassified') return;
       const cites = [...(q.current_ai_visibility?.top_citations ?? []), ...(q.external_top3_benchmark ?? [])];
       cites.forEach((c) => {
         const st = label(c.sourceType || 'other');
@@ -84,24 +86,25 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
         journeySourceCounts[journey][st] = (journeySourceCounts[journey][st] || 0) + 1;
       });
     });
-    // Convert to percentage per journey
-    return Object.entries(journeySourceCounts).map(([journey, sources]) => {
-      const total = Object.values(sources).reduce((a, b) => a + b, 0) || 1;
-      const row: Record<string, unknown> = { journey };
-      allSourceTypes.forEach((st) => {
-        row[st] = Math.round(((sources[st] || 0) / total) * 100 * 10) / 10;
+
+    const sourceTypes = Array.from(allSourceTypes).slice(0, 8);
+    const journeys = Object.keys(journeySourceCounts).slice(0, 8);
+
+    if (!sourceTypes.length || !journeys.length) return { chartData: [] as Record<string, unknown>[], journeyNames: [] as string[] };
+
+    // Each row = a source type (axis), each journey = a radar line
+    const chartData = sourceTypes.map((st) => {
+      const row: Record<string, unknown> = { sourceType: st };
+      journeys.forEach((journey) => {
+        const sources = journeySourceCounts[journey];
+        const total = Object.values(sources).reduce((a, b) => a + b, 0) || 1;
+        row[journey] = Math.round(((sources[st] || 0) / total) * 100 * 10) / 10;
       });
       return row;
     });
-  }, [report.queryWorkbench]);
 
-  const journeySourceTypes = useMemo(() => {
-    const types = new Set<string>();
-    journeyShareData.forEach((row) => {
-      Object.keys(row).forEach((k) => { if (k !== 'journey' && typeof row[k] === 'number') types.add(k); });
-    });
-    return Array.from(types);
-  }, [journeyShareData]);
+    return { chartData, journeyNames: journeys };
+  }, [report.queryWorkbench]);
 
   // Filter citation table rows - exclude owned_brand_ecosystem rows without a query
   const tableRows = useMemo(() => {
@@ -192,32 +195,41 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
 
         {graphView === 'journeyShare' && (
           <div className="h-[28rem] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
-            <p className="mb-2 text-xs text-[var(--text-muted)]">Source type citation percentage share by journey categories (brand topics)</p>
-            {journeyShareData.length ? (
+            <p className="mb-2 text-xs text-[var(--text-muted)]">Source type citation percentage share by journey categories (brand topics). Each radar line is a journey category.</p>
+            {radarShareData.chartData.length ? (
               <ResponsiveContainer width="100%" height="95%">
-                <BarChart data={journeyShareData} layout="vertical" margin={{ top: 10, right: 30, left: 120, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
-                  <YAxis dataKey="journey" type="category" width={110} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarShareData.chartData}>
+                  <PolarGrid stroke="var(--border-subtle)" />
+                  <PolarAngleAxis dataKey="sourceType" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fill: 'var(--text-muted)', fontSize: 9 }} />
+                  {radarShareData.journeyNames.map((journey, i) => (
+                    <Radar
+                      key={journey}
+                      name={journey}
+                      dataKey={journey}
+                      stroke={palette[i % palette.length]}
+                      fill={palette[i % palette.length]}
+                      fillOpacity={0.08}
+                      strokeWidth={2}
+                    />
+                  ))}
+                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-secondary)' }} />
                   <Tooltip
-                    content={({ active, payload, label: journeyLabel }) => {
+                    content={({ active, payload, label: stLabel }) => {
                       if (!active || !payload?.length) return null;
                       return (
                         <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3 text-sm shadow-lg">
-                          <p className="font-semibold text-[var(--text-primary)] mb-1">{journeyLabel}</p>
+                          <p className="font-semibold text-[var(--text-primary)] mb-1">{stLabel}</p>
                           {payload.map((p) => (
-                            <p key={p.dataKey as string} className="text-[var(--text-secondary)]">
-                              <span style={{ color: p.color }}>●</span> {String(p.dataKey)}: {p.value}%
+                            <p key={String(p.dataKey)} className="text-[var(--text-secondary)]">
+                              <span style={{ color: p.color }}>{"\u25CF"}</span> {String(p.name)}: {p.value}%
                             </p>
                           ))}
                         </div>
                       );
                     }}
                   />
-                  {journeySourceTypes.map((st, i) => (
-                    <Bar key={st} dataKey={st} stackId="a" fill={palette[i % palette.length]} />
-                  ))}
-                </BarChart>
+                </RadarChart>
               </ResponsiveContainer>
             ) : <Empty>No journey category data available. Run analysis with query workbench data.</Empty>}
           </div>

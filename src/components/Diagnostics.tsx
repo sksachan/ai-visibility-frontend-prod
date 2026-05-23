@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import type { OwnedPage, ReportBundle } from '../types/report';
 import { WorkspacePanel, SectionHeader, DarkButton } from './ui';
 
@@ -66,15 +66,14 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
     });
   }, [filtered, report.ownedPages]);
 
-  // Comparison chart data: by brand topic (journey category)
-  const comparisonData = useMemo(() => {
+  // Radar chart data: avg of 6 dimensions by journey category (brand topics)
+  const radarData = useMemo(() => {
     const pages = filtered.length ? filtered : report.ownedPages;
+    // Group pages by journey category
     const topicMap: Record<string, { count: number; dims: Record<string, number> }> = {};
     pages.forEach((p) => {
       const topics = new Set<string>();
-      p.relatedQueries.forEach((q) => {
-        const vis = q.visibilityStatus || '';
-        // Try to get topic from journey category or just use a generic label
+      p.relatedQueries.forEach(() => {
         topics.add(p.journeyCategory || 'Unclassified');
       });
       if (!topics.size) topics.add(p.journeyCategory || 'Unclassified');
@@ -86,16 +85,24 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
         });
       });
     });
-    return Object.entries(topicMap)
+
+    // Get journey categories (exclude Unclassified)
+    const journeys = Object.entries(topicMap)
       .filter(([t]) => t && t !== 'Unclassified')
-      .slice(0, 8)
-      .map(([topic, data]) => {
-        const row: Record<string, unknown> = { topic };
-        dimensionKeys.forEach((k) => {
-          row[k] = Math.round((data.dims[k] / data.count) * 10) / 10;
-        });
-        return row;
+      .slice(0, 8);
+
+    if (!journeys.length) return { chartData: [] as Record<string, unknown>[], journeyNames: [] as string[] };
+
+    // Build radar data: each row is a dimension, each journey is a line
+    const chartData = dimensionKeys.map((key) => {
+      const row: Record<string, unknown> = { dimension: dimensionLabels[key] };
+      journeys.forEach(([topic, data]) => {
+        row[topic] = Math.round((data.dims[key] / data.count) * 10) / 10;
       });
+      return row;
+    });
+
+    return { chartData, journeyNames: journeys.map(([t]) => t) };
   }, [filtered, report.ownedPages]);
 
   function toggle(key: SortKey) {
@@ -155,24 +162,43 @@ export function OwnedUrlReadiness({ report, onOpenCms }: { report: ReportBundle;
         {graphMode === 'comparison' && (
           <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
             <p className="mb-3 text-sm text-[var(--text-secondary)]">
-              Average of 6 GEO dimensions by journey categories (brand topics). Compare dimension strengths across topics.
+              Average of 6 GEO dimensions by journey categories (brand topics). Each line on the radar represents a journey category average.
             </p>
-            <div className="h-96">
-              {comparisonData.length ? (
+            <div className="h-[28rem]">
+              {radarData.chartData.length ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={comparisonData} margin={{ top: 10, right: 30, left: 20, bottom: 60 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                    <XAxis dataKey="topic" angle={-25} textAnchor="end" interval={0} height={60} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
-                    <YAxis domain={[0, 20]} label={{ value: 'Avg score /20', angle: -90, position: 'insideLeft', fill: 'var(--text-muted)' }} tick={{ fill: 'var(--text-secondary)' }} />
-                    {dimensionKeys.map((k, i) => (
-                      <Bar key={k} dataKey={k} name={dimensionLabels[k]} fill={dimPalette[i % dimPalette.length]} />
+                  <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData.chartData}>
+                    <PolarGrid stroke="var(--border-subtle)" />
+                    <PolarAngleAxis dataKey="dimension" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 20]} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} />
+                    {radarData.journeyNames.map((journey, i) => (
+                      <Radar
+                        key={journey}
+                        name={journey}
+                        dataKey={journey}
+                        stroke={dimPalette[i % dimPalette.length]}
+                        fill={dimPalette[i % dimPalette.length]}
+                        fillOpacity={0.1}
+                        strokeWidth={2}
+                      />
                     ))}
                     <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-secondary)' }} />
-                    <Tooltip content={({ active, payload, label: topicLabel }) => {
-                      if (!active || !payload?.length) return null;
-                      return <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3 text-sm shadow-lg"><p className="font-semibold text-[var(--text-primary)] mb-1">{topicLabel}</p>{payload.map((p) => <p key={String(p.dataKey)} className="text-[var(--text-secondary)]"><span style={{ color: p.color }}>●</span> {String(p.name)}: {p.value}/20</p>)}</div>;
-                    }} />
-                  </BarChart>
+                    <Tooltip
+                      content={({ active, payload, label: dimLabel }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3 text-sm shadow-lg">
+                            <p className="font-semibold text-[var(--text-primary)] mb-1">{dimLabel}</p>
+                            {payload.map((p) => (
+                              <p key={String(p.dataKey)} className="text-[var(--text-secondary)]">
+                                <span style={{ color: p.color }}>{"\u25CF"}</span> {String(p.name)}: {p.value}/20
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                  </RadarChart>
                 </ResponsiveContainer>
               ) : <p className="text-sm text-[var(--text-muted)]">No topic data available for comparison. Pages need journey categories or related queries.</p>}
             </div>
