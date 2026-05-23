@@ -165,7 +165,10 @@ export async function refreshEvidence(payload: RefreshEvidencePayload): Promise<
 export async function fetchBrandConfigs(): Promise<BrandConfig[]> {
   const res = await fetch('/api/evidence/brands');
   const data = await jsonOrThrow(res);
-  return Array.isArray(data) ? data : (data as Record<string, unknown>).configs as BrandConfig[] ?? [];
+  if (Array.isArray(data)) return data;
+  const obj = data as Record<string, unknown>;
+  const list = obj.brands ?? obj.configs ?? obj.data ?? [];
+  return Array.isArray(list) ? list as BrandConfig[] : [];
 }
 
 export async function saveBrandConfig(config: Partial<BrandConfig> & { brand: string; market: string }): Promise<BrandConfig> {
