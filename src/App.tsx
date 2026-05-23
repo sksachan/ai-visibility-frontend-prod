@@ -14,6 +14,7 @@ import { exportReportToPdf } from './lib/pdf';
 import { normaliseReport } from './lib/normaliseReport';
 import type { ReportBundle } from './types/report';
 import { mockReport } from './data/mockReport';
+import bodhiLogo from './bodhi-mark.svg';
 
 type Tab = 'executive' | 'workbench' | 'matrix' | 'owned' | 'cms' | 'pr' | 'actions' | 'runs' | 'appendix' | 'refresh';
 type Notice = { tone: 'success' | 'warning' | 'error'; message: string } | null;
@@ -203,8 +204,8 @@ export default function App() {
             <div className="flex items-center justify-between gap-4 px-5 py-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="hidden lg:flex items-center gap-2 text-[13px] text-[var(--text-muted)]">
-                  <span className="font-semibold text-[var(--accent-blue)]">Powered by Bodhi</span>
-                  <img src="/bodhi-mark.svg" alt="Bodhi logo" className="h-4" />
+                  <span className="font-semibold text-[var(--accent-blue)]">Powered by</span>
+                  <img src={bodhiLogo} alt="Bodhi logo" className="h-4" />
                   <span>/</span>
                   <span className="text-[var(--text-secondary)]">{report.brand} · {report.market}</span>
                 </div>
