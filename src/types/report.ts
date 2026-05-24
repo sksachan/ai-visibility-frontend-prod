@@ -19,14 +19,16 @@ export interface HeadlineMetrics {
 }
 
 export interface BrandTopicScorecardRow {
-  topic: string;
-  aiVisibilityScore: number | null;
-  relativePosition: string;
-  directionVsLastPeriod: string;
-  comment: string;
-  queryCount?: number;
-  ownedUrlCount?: number;
-  citationCount?: number;
+topic: string;
+aiVisibilityScore: number | null;
+relativePosition: string;
+directionVsLastPeriod: string;
+avgBrandSentiment?: string;
+avgBrandSentimentScore?: number;
+comment: string;
+queryCount?: number;
+ownedUrlCount?: number;
+citationCount?: number;
 }
 
 export interface ExecutiveSection {

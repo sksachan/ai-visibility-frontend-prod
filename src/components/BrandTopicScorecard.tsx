@@ -20,6 +20,16 @@ function directionTone(value: string): string {
   return 'bg-white/5 text-[var(--text-muted)] ring-1 ring-white/10';
 }
 
+function sentimentTone(value?: string): string {
+  if (!value || value === 'not_applicable') return 'bg-white/5 text-[var(--text-muted)] ring-1 ring-white/10';
+  const t = value.toLowerCase();
+  if (t === 'positive') return 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20';
+  if (t === 'negative') return 'bg-red-500/10 text-red-400 ring-1 ring-red-500/20';
+  if (t === 'mixed') return 'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20';
+  if (t === 'neutral') return 'bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20';
+  return 'bg-white/5 text-[var(--text-muted)] ring-1 ring-white/10';
+}
+
 export function BrandTopicScorecard({ rows }: { rows: BrandTopicScorecardRow[] }) {
   if (!rows.length) return null;
   return (
@@ -54,7 +64,11 @@ export function BrandTopicScorecard({ rows }: { rows: BrandTopicScorecardRow[] }
                   </td>
                   <td className="max-w-sm px-4 py-4 text-sm leading-6 text-[var(--text-secondary)]">{row.relativePosition}</td>
                   <td className="px-4 py-4">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${directionTone(row.directionVsLastPeriod)}`}>{row.directionVsLastPeriod !== 'Not available' ? row.directionVsLastPeriod : 'N/A'}</span>
+                    <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${sentimentTone(row.avgBrandSentiment)}`}>
+                      {row.avgBrandSentiment && row.avgBrandSentiment !== 'not_applicable'
+                        ? `${row.avgBrandSentiment}${row.avgBrandSentimentScore != null ? ` (${row.avgBrandSentimentScore > 0 ? '+' : ''}${row.avgBrandSentimentScore})` : ''}`
+                        : 'N/A'}
+                    </span>
                   </td>
                   <td className="max-w-md px-4 py-4 text-sm leading-6 text-[var(--text-secondary)]">{row.comment}</td>
                 </tr>

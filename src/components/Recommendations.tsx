@@ -267,13 +267,20 @@ function ValidationDisplay({ asset }: { asset: AdvancedGeoAsset }) {
 }
 
 function CmsCopyBlock({ module, item, index }: { module: CmsCopyModule; item: RecommendationModule; index: number }) {
+  // Deduplicate: skip introCopy if it's identical or near-identical to bodyCopy or recommendation
+  const introText = (module.introCopy || '').trim();
+  const bodyText = (module.bodyCopy || '').trim();
+  const recText = (item.recommendation || '').trim();
+  const introIsDuplicate = !introText
+    || introText === bodyText
+    || introText === recText
+    || (bodyText && introText.length > 20 && bodyText.startsWith(introText.slice(0, 40)));
   return (
     <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm leading-6 text-[var(--text-secondary)]">
       <p className="typo-meta text-[var(--text-muted)]">Content recommendation {index + 1}</p>
       <p className="mt-3 font-semibold text-[var(--text-primary)]">{module.heading || item.title}</p>
-      {/* Show intro copy only once — avoid duplicate (issue #7) */}
-      {module.introCopy && module.introCopy !== module.bodyCopy ? <p className="mt-2">{module.introCopy}</p> : null}
-      {module.bodyCopy ? <p className="mt-2">{module.bodyCopy}</p> : <p className="mt-2">{item.recommendation}</p>}
+      {!introIsDuplicate && <p className="mt-2">{introText}</p>}
+      {bodyText ? <p className="mt-2">{bodyText}</p> : <p className="mt-2">{recText}</p>}
       {module.bullets?.length ? <ul className="mt-2 list-disc space-y-1 pl-5">{module.bullets.slice(0, 5).map((point) => <li key={point}>{point}</li>)}</ul> : null}
     </div>
   );
