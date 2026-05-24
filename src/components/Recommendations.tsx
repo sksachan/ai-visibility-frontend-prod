@@ -123,10 +123,12 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
   const [activeTab, setActiveTab] = useState<'brief' | 'jsonld' | 'facts' | 'faq'>('brief');
   const tabList = ['brief', 'jsonld', 'facts', 'faq'] as const;
   const tabLabels = { brief: 'Brief', jsonld: 'JSON-LD', facts: 'Facts Verified on Page', faq: 'FAQ' };
-  // Collect direct answer from new schema fields or fallback to advanced asset
+  // Collect direct answer: prefer LLM-merged field, then advanced asset, then deterministic fallback
   const directAnswer = item.directAnswer || (asset?.direct_answer_40_words) || '';
   const primaryQueryId = item.primaryQueryId || item.linkedQueryIds?.[0] || '';
   const primaryQueryText = item.primaryQueryText || '';
+  const isCmsLlmMerged = !!(item as Record<string, unknown>).cms_llm_merged;
+  const evidenceStatus = directAnswer && !directAnswer.includes('[Pending') && !directAnswer.includes('[Direct answer pending') ? 'verified' : 'needs validation';
   // Collect FAQ items from new schema fields, then copyModules, then item.faqItems
   const allFaqItems = (item.faqItems?.length ? item.faqItems : modules.flatMap((m) => m.faqItems || []));
   // Intent tags from new schema
@@ -143,13 +145,19 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
       {activeTab === 'brief' && (
         <>
           {modules.map((module, index) => <CmsCopyBlock key={`${module.moduleId}-${index}`} module={module} item={item} index={index} />)}
-          {/* Direct Answer section — uses new schema fields first, then advanced asset */}
+          {/* Direct Answer section — uses LLM-merged field first, then advanced asset, then deterministic fallback */}
           {directAnswer && (
             <div className="rounded-[var(--radius-sm)] bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/25 p-3 text-sm">
-              <p className="typo-meta text-[var(--accent-blue)]">Direct Answer</p>
-              {primaryQueryText && <p className="mt-1 text-xs text-[var(--text-secondary)]">{primaryQueryText}</p>}
-              {primaryQueryId && !primaryQueryText && <p className="mt-1 text-xs text-[var(--text-muted)]">Query: <span className="font-medium text-[var(--text-secondary)]">{primaryQueryId}</span></p>}
-              <p className="mt-2 text-[var(--text-primary)] font-medium">{directAnswer}</p>
+              <div className="flex items-center justify-between">
+                <p className="typo-meta text-[var(--accent-blue)]">Direct Answer</p>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${evidenceStatus === 'verified' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' : 'bg-amber-500/15 text-amber-400 border border-amber-500/25'}`}>
+                  Evidence: {evidenceStatus}
+                </span>
+              </div>
+              {primaryQueryText && <p className="mt-2 text-xs text-[var(--text-muted)]">Query: <span className="font-medium text-[var(--text-secondary)]">{primaryQueryText}</span></p>}
+              {primaryQueryId && !primaryQueryText && <p className="mt-2 text-xs text-[var(--text-muted)]">Query: <span className="font-medium text-[var(--text-secondary)]">{primaryQueryId}</span></p>}
+              <p className="mt-2 text-[var(--text-primary)] font-medium leading-relaxed">{directAnswer}</p>
+              {isCmsLlmMerged && <p className="mt-2 text-[10px] text-[var(--text-muted)]">Source: CMS LLM agent (fact-constrained)</p>}
             </div>
           )}
           {/* Intent tags */}
@@ -170,22 +178,70 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
           )}
         </>
       )}
-      {activeTab === 'jsonld' && asset && (
-        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3">
-          <p className="typo-meta text-[var(--text-muted)] mb-2">JSON-LD Extension</p>
-          <p className="text-xs text-[var(--text-muted)] mb-2">Strategy: <span className="font-semibold text-[var(--text-secondary)]">{asset.json_ld_strategy}</span>{asset.target_anchor_id && <> · Anchor: <code className="text-xs text-[var(--accent-purple)]">{asset.target_anchor_id}</code></>}</p>
-          {asset.json_ld_script && <pre className="overflow-x-auto rounded-[var(--radius-sm)] bg-[var(--bg-app)] border border-[var(--border-subtle)] p-3 text-xs text-amber-300">{asset.json_ld_script}</pre>}
-          {asset.json_ld_merge_notes.length > 0 && (
-            <ul className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">{asset.json_ld_merge_notes.map((note, i) => <li key={i}>• {note}</li>)}</ul>
+      {activeTab === 'jsonld' && (
+        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 space-y-3">
+          <p className="typo-meta text-[var(--text-muted)]">JSON-LD Suggestions</p>
+          {/* Show LLM-generated JSON-LD tags first (from merged CMS output) */}
+          {item.jsonLdTags && item.jsonLdTags.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-[var(--accent-purple)]">Intent-aware JSON-LD recommendations</p>
+              {item.jsonLdTags.map((tag, i) => (
+                <div key={i} className="rounded-[var(--radius-sm)] border border-[var(--accent-purple)]/20 bg-[var(--accent-purple)]/5 p-2 text-xs text-[var(--text-secondary)] font-mono break-all">
+                  {typeof tag === 'string' ? tag : JSON.stringify(tag, null, 2)}
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Show advanced asset JSON-LD if available */}
+          {asset && (
+            <>
+              <p className="text-xs text-[var(--text-muted)]">Strategy: <span className="font-semibold text-[var(--text-secondary)]">{asset.json_ld_strategy}</span>{asset.target_anchor_id && <> · Anchor: <code className="text-xs text-[var(--accent-purple)]">{asset.target_anchor_id}</code></>}</p>
+              {asset.json_ld_script && <pre className="overflow-x-auto rounded-[var(--radius-sm)] bg-[var(--bg-app)] border border-[var(--border-subtle)] p-3 text-xs text-amber-300">{asset.json_ld_script}</pre>}
+              {asset.json_ld_merge_notes.length > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">{asset.json_ld_merge_notes.map((note, i) => <li key={i}>• {note}</li>)}</ul>
+              )}
+            </>
+          )}
+          {!asset && (!item.jsonLdTags || item.jsonLdTags.length === 0) && (
+            <p className="text-sm text-[var(--text-muted)]">No JSON-LD data available. JSON-LD will be generated by the Bodhi CMS LLM agent in future runs.</p>
           )}
         </div>
       )}
-      {activeTab === 'jsonld' && !asset && (
-        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm text-[var(--text-muted)]">No JSON-LD extension data available for this recommendation. JSON-LD will be generated by the Bodhi workflow in future runs.</div>
-      )}
-      {activeTab === 'facts' && asset && <FactsDisplay facts={asset.facts_used} />}
-      {activeTab === 'facts' && !asset && (
-        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm text-[var(--text-muted)]">No verified facts data available. Facts will be extracted from owned page crawl evidence by the Bodhi workflow.</div>
+      {activeTab === 'facts' && (
+        <div className="space-y-3">
+          {/* Show LLM-merged facts_used first */}
+          {item.factsUsed && item.factsUsed.length > 0 && (
+            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3">
+              <p className="typo-meta text-emerald-400 mb-2">Verified Facts ({item.factsUsed.length})</p>
+              <div className="space-y-2">
+                {item.factsUsed.map((fact: Record<string, unknown>, i: number) => (
+                  <div key={i} className="rounded-[var(--radius-sm)] border border-emerald-500/25 bg-emerald-500/8 p-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent-success)]" />
+                      <span className="font-semibold text-[var(--text-primary)]">{String(fact.fact || '')}</span>
+                      {fact.value && <span className="text-[var(--text-secondary)]">{String(fact.value)}{fact.unit ? ` ${fact.unit}` : ''}</span>}
+                    </div>
+                    {fact.source && <p className="mt-1 text-[var(--text-muted)]">Source: <span className="font-semibold text-[var(--text-secondary)]">{String(fact.source).replace(/_/g, ' ')}</span></p>}
+                    {fact.source_context_snippet && <p className="mt-0.5 text-[var(--text-muted)] break-all">Snippet: {String(fact.source_context_snippet).slice(0, 200)}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Show advanced asset facts if available and no LLM facts */}
+          {(!item.factsUsed || item.factsUsed.length === 0) && asset && <FactsDisplay facts={asset.facts_used} />}
+          {/* Show facts_missing as actionable items */}
+          {item.factsMissing && item.factsMissing.length > 0 && (
+            <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="typo-meta text-amber-300 mb-2">Missing Facts — Recommended Data to Add ({item.factsMissing.length})</p>
+              <p className="text-xs text-[var(--text-muted)] mb-2">These facts would strengthen the brand's AI answer but are not currently available on the target page.</p>
+              <ul className="space-y-1">{item.factsMissing.map((f: string, i: number) => <li key={i} className="text-xs text-[var(--text-secondary)]">• {f}</li>)}</ul>
+            </div>
+          )}
+          {(!item.factsUsed || item.factsUsed.length === 0) && !asset && (!item.factsMissing || item.factsMissing.length === 0) && (
+            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm text-[var(--text-muted)]">No verified facts data available yet. Facts will be extracted from owned page crawl evidence by the Bodhi CMS LLM agent.</div>
+          )}
+        </div>
       )}
       {activeTab === 'faq' && (
         <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 space-y-3">
