@@ -67,12 +67,11 @@ export function CmsRecommendations({ report, highlightUrl }: { report: ReportBun
         <span className="font-semibold">⚠ Disclaimer</span>
         <span>Please review each recommendation with your Brand, Content, and Legal teams before making any changes to live pages.</span>
       </div>
-      <RecommendationPanel title={`Content Insights \u2014 Page-level recommendations (${report.cmsModules.length})`} eyebrow="Content remediation" items={report.cmsModules} type="cms" highlightUrl={highlightUrl} />
-      <div className="flex justify-end">
+      <RecommendationPanel title={`Content Insights \u2014 Page-level recommendations (${report.cmsModules.length})`} eyebrow="Content remediation" items={report.cmsModules} type="cms" highlightUrl={highlightUrl} exportButton={
         <DarkButton onClick={() => exportCmsModules(report.cmsModules)} disabled={!report.cmsModules.length}>
           <Download size={13} /> Export CSV
         </DarkButton>
-      </div>
+      } />
     </div>
   );
 }
@@ -84,17 +83,16 @@ export function PrRecommendations({ report }: { report: ReportBundle }) {
         <span className="font-semibold">⚠ Disclaimer</span>
         <span>Please review each PR recommendation with your Brand, Content, and Legal teams before executing any external outreach or asset creation.</span>
       </div>
-      <RecommendationPanel title={`PR & Brand Insights \u2014 Grouped opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" />
-      <div className="flex justify-end">
+      <RecommendationPanel title={`PR & Brand Insights \u2014 Grouped opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" exportButton={
         <DarkButton onClick={() => exportPrModules(report.prOpportunities)} disabled={!report.prOpportunities.length}>
           <Download size={13} /> Export CSV
         </DarkButton>
-      </div>
+      } />
     </div>
   );
 }
 
-function RecommendationPanel({ title, eyebrow, items, type, highlightUrl }: { title: string; eyebrow: string; items: RecommendationModule[]; type: 'cms' | 'pr'; highlightUrl?: string }) {
+function RecommendationPanel({ title, eyebrow, items, type, highlightUrl, exportButton }: { title: string; eyebrow: string; items: RecommendationModule[]; type: 'cms' | 'pr'; highlightUrl?: string; exportButton?: React.ReactNode }) {
   const [search, setSearch] = useState('');
   const [priority, setPriority] = useState('All');
   const [journey, setJourney] = useState('All');
@@ -134,11 +132,14 @@ function RecommendationPanel({ title, eyebrow, items, type, highlightUrl }: { ti
 
   return (
     <Card>
-      <SectionTitle eyebrow={eyebrow} title={`${title} \u00b7 showing ${filtered.length}`}>
-        {type === 'cms'
-          ? 'Content recommendations are tracked at owned-page level. Each card aggregates linked queries and shows copy-ready modules for the highest-value page changes.'
-          : 'PR & Brand Insights are tracked separately from owned URLs. Each card groups queries by external source pattern and prioritises opportunities that can influence multiple queries.'}
-      </SectionTitle>
+      <div className="flex items-center justify-between mb-2">
+        <SectionTitle eyebrow={eyebrow} title={`${title} \u00b7 showing ${filtered.length}`}>
+          {type === 'cms'
+            ? 'Content recommendations are tracked at owned-page level. Each card aggregates linked queries and shows copy-ready modules for the highest-value page changes.'
+            : 'PR & Brand Insights are tracked separately from owned URLs. Each card groups queries by external source pattern and prioritises opportunities that can influence multiple queries.'}
+        </SectionTitle>
+        {exportButton}
+      </div>
       <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <input className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" placeholder={type === 'cms' ? 'Search page, module, query ID...' : 'Search source type, domain, query ID...'} value={search} onChange={(event) => { setSearch(event.target.value); setCardPage(0); }} />
         <select className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" value={priority} onChange={(event) => setPriority(event.target.value)}>
