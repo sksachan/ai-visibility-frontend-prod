@@ -368,69 +368,162 @@ function PrCardBody({ item }: { item: RecommendationModule }) {
         ))}
       </div>
       {activeTab === 'overview' && (
-        <>
-          <p className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm leading-6 text-[var(--text-secondary)]">{item.recommendation || 'Overview content will be populated by the Bodhi PR strategy workflow node.'}</p>
-          {item.whyItMatters ? <p className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm leading-6 text-[var(--text-secondary)]"><span className="font-semibold text-[var(--text-primary)]">Why it matters:</span> {item.whyItMatters}</p> : null}
-          {item.observedExternalDomains?.length ? (
-            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3">
-              <p className="typo-meta text-[var(--text-muted)] mb-2">Observed External Domains</p>
-              <div className="flex flex-wrap gap-1">{item.observedExternalDomains.slice(0, 10).map((d, i) => <span key={i} className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-1 text-xs text-[var(--text-secondary)]">{d.domain}{d.count ? ` (${d.count})` : ''}</span>)}</div>
+        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-4 space-y-4">
+          {/* Insight */}
+          <div>
+            <p className="typo-meta text-[var(--accent-blue)] mb-1">Insight</p>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              {pack?.insight_summary || item.recommendation || 'AI answers are relying on external publishers for queries in this category. The brand is present in owned pages but lacks third-party proof that AI systems can cite confidently.'}
+            </p>
+          </div>
+          {/* Recommended PR action */}
+          <div>
+            <p className="typo-meta text-[var(--accent-blue)] mb-1">Recommended PR action</p>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              {pack?.recommended_pr_action || item.recommendation || 'Create a third-party-referenceable evidence package covering the key buyer queries in this category.'}
+            </p>
+          </div>
+          {/* Expected visibility impact */}
+          <div>
+            <p className="typo-meta text-[var(--accent-blue)] mb-1">Expected visibility impact</p>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              Targets {item.queryCoverageCount || item.linkedQueryIds?.length || 0} linked queries where the brand is currently external-led or competitor-led. Goal is to increase trusted external citations that mention the brand and support owned-page claims.
+            </p>
+          </div>
+          {/* Priority queries */}
+          {(pack?.priority_queries?.length || item.linkedQueryIds?.length) ? (
+            <div>
+              <p className="typo-meta text-[var(--accent-blue)] mb-1">Priority queries</p>
+              <ul className="space-y-0.5">
+                {(pack?.priority_queries || item.linkedQueryIds || []).slice(0, 8).map((q, i) => (
+                  <li key={i} className="text-xs text-[var(--text-secondary)]">• {q}</li>
+                ))}
+              </ul>
             </div>
           ) : null}
-          {item.targetSourceTypes?.length ? (
-            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3">
-              <p className="typo-meta text-[var(--text-muted)] mb-2">Target Source Types</p>
-              <div className="flex flex-wrap gap-1">{item.targetSourceTypes.map((t, i) => <span key={i} className="rounded-full bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/20 px-2 py-1 text-xs text-[var(--accent-blue)]">{label(t)}</span>)}</div>
+          {/* Proof required */}
+          {(pack?.brand_data_required?.length || pack?.unique_brand_data_required?.length) ? (
+            <div>
+              <p className="typo-meta text-[var(--accent-blue)] mb-1">Proof required</p>
+              <ul className="space-y-0.5">
+                {(pack?.brand_data_required || pack?.unique_brand_data_required || []).map((d, i) => (
+                  <li key={i} className="text-xs text-[var(--text-secondary)]">• {d.replace(/_/g, ' ')}</li>
+                ))}
+              </ul>
             </div>
           ) : null}
-        </>
+        </div>
       )}
       {activeTab === 'asset' && pack && (
-        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 space-y-2">
-          <p className="typo-meta text-[var(--text-muted)]">Asset Pack Details</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Asset Name</p><p className="text-sm font-semibold text-[var(--text-primary)]">{pack.asset_name}</p></div>
-            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Asset Type</p><p className="text-sm font-semibold text-[var(--text-primary)]">{pack.asset_type.replace(/_/g, ' ')}</p></div>
+        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-4 space-y-4">
+          {/* Asset Concept */}
+          <div className="rounded-[var(--radius-sm)] bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/20 p-3">
+            <p className="typo-meta text-[var(--accent-blue)] mb-1">Asset Concept</p>
+            <p className="text-base font-semibold text-[var(--text-primary)]">{pack.asset_concept || pack.asset_name}</p>
           </div>
-          <div className="rounded-[var(--radius-sm)] bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/20 p-2"><p className="text-xs text-[var(--accent-blue)] font-semibold">Information Gain Trigger</p><p className="text-sm text-[var(--text-secondary)]">{pack.information_gain_trigger}</p></div>
-          <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Suggested Headline</p><p className="text-sm font-semibold text-[var(--text-primary)] break-words">{pack.suggested_headline}</p></div>
-          {pack.example_pitch_headline && pack.example_pitch_headline !== pack.suggested_headline && (
-            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Example Pitch Headline</p><p className="text-sm font-semibold text-[var(--text-primary)] break-words">{pack.example_pitch_headline}</p></div>
-          )}
-          {pack.asset_objective && (
-            <div className="rounded-[var(--radius-sm)] bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/20 p-2"><p className="text-xs text-[var(--accent-blue)] font-semibold">Asset Objective</p><p className="text-sm text-[var(--text-secondary)]">{pack.asset_objective}</p></div>
-          )}
-          {pack.target_publication_angle && (
-            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Target Publication Angle</p><p className="text-sm text-[var(--text-secondary)]">{pack.target_publication_angle}</p></div>
-          )}
-          {pack.proof_gap_addressed && (
-            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Proof Gap Addressed</p><p className="text-sm text-[var(--text-secondary)]">{pack.proof_gap_addressed}</p></div>
-          )}
-          <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2"><p className="text-xs text-[var(--text-muted)]">Briefing Copy</p><p className="text-sm text-[var(--text-secondary)] break-words">{pack.briefing_copy}</p></div>
-          {pack.priority_queries && pack.priority_queries.length > 0 && (
-            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-2">
-              <p className="text-xs text-[var(--text-muted)] font-semibold">Priority Queries</p>
-              <ul className="mt-1 space-y-0.5">{pack.priority_queries.slice(0, 5).map((q, i) => <li key={i} className="text-xs text-[var(--text-secondary)]">{i + 1}. {q}</li>)}</ul>
+          {/* Core Claim To Prove */}
+          <div>
+            <p className="typo-meta text-[var(--accent-purple)] mb-1">Core Claim To Prove</p>
+            <p className="text-sm leading-6 text-[var(--text-secondary)]">
+              {pack.core_claim_to_prove || pack.information_gain_trigger || 'The single claim the brand wants third parties to validate.'}
+            </p>
+          </div>
+          {/* What To Publish */}
+          <div>
+            <p className="typo-meta text-[var(--text-muted)] mb-1">What To Publish</p>
+            {pack.publishable_assets && pack.publishable_assets.length > 0 ? (
+              <ul className="space-y-1">
+                {pack.publishable_assets.map((a, i) => (
+                  <li key={i} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent-success)]"></span> {a}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ul className="space-y-1">
+                <li className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent-success)]"></span> Data-led press release</li>
+                <li className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent-success)]"></span> Downloadable proof sheet</li>
+                <li className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--accent-success)]"></span> Expert commentary pitch</li>
+              </ul>
+            )}
+          </div>
+          {/* What PR Should Pitch */}
+          <div>
+            <p className="typo-meta text-[var(--text-muted)] mb-1">What PR Should Pitch</p>
+            <div className="rounded-[var(--radius-sm)] bg-[var(--bg-card)] p-3">
+              <p className="text-sm font-semibold text-[var(--text-primary)] break-words">{pack.suggested_headline}</p>
+              {pack.example_pitch_headline && pack.example_pitch_headline !== pack.suggested_headline && (
+                <p className="mt-2 text-xs text-[var(--text-muted)]">Alternative angle: <span className="text-[var(--text-secondary)]">{pack.example_pitch_headline}</span></p>
+              )}
+              {pack.target_publication_angle && (
+                <p className="mt-2 text-xs text-[var(--text-secondary)]">{pack.target_publication_angle}</p>
+              )}
             </div>
-          )}
-          {pack.unique_brand_data_required.length > 0 && (
-            <div className="rounded-[var(--radius-sm)] bg-amber-500/10 border border-amber-500/25 p-2">
-              <p className="text-xs text-amber-300 font-semibold">Brand Data Required</p>
-              <ul className="mt-1 space-y-0.5">{pack.unique_brand_data_required.map((d, i) => <li key={i} className="text-xs text-[var(--text-secondary)]">• {d.replace(/_/g, ' ')}</li>)}</ul>
+          </div>
+          {/* Brand Data Required */}
+          {(pack.brand_data_required?.length || pack.unique_brand_data_required?.length) ? (
+            <div className="rounded-[var(--radius-sm)] bg-amber-500/10 border border-amber-500/25 p-3">
+              <p className="typo-meta text-amber-300 mb-1">Brand Data Required</p>
+              <ul className="space-y-0.5">
+                {(pack.brand_data_required || pack.unique_brand_data_required || []).map((d, i) => (
+                  <li key={i} className="text-xs text-[var(--text-secondary)]">• {d.replace(/_/g, ' ')}</li>
+                ))}
+              </ul>
             </div>
-          )}
+          ) : null}
         </div>
       )}
       {activeTab === 'asset' && !pack && (
         <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm text-[var(--text-muted)]">Asset pack details will be generated by the Bodhi PR workflow node in future runs.</div>
       )}
       {activeTab === 'publishers' && pack && (
-        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 space-y-2">
-          <p className="typo-meta text-[var(--text-muted)]">Publisher Targets</p>
-          <div className="flex flex-wrap gap-1">{pack.target_publisher_types.map((t, i) => <span key={i} className="rounded-full bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/20 px-2 py-1 text-xs text-[var(--accent-blue)]">{t.replace(/_/g, ' ')}</span>)}</div>
-          {pack.target_domains_observed.length > 0 && (
-            <><p className="text-xs font-semibold text-[var(--text-muted)] mt-2">Observed Domains</p>
-            <div className="flex flex-wrap gap-1">{pack.target_domains_observed.map((d, i) => <span key={i} className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-1 text-xs text-[var(--text-secondary)]">{d}</span>)}</div></>
+        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-4 space-y-4">
+          <p className="typo-meta text-[var(--text-muted)]">Publisher Targets — grouped by publisher role</p>
+          {/* Render publisher_groups if available from LLM */}
+          {pack.publisher_groups && pack.publisher_groups.length > 0 ? (
+            <div className="space-y-3">
+              {pack.publisher_groups.map((group, i) => (
+                <div key={i} className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 space-y-2">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{group.group}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">{group.why_it_matters}</p>
+                  {group.observed_domains.length > 0 && (
+                    <div>
+                      <p className="typo-meta text-[var(--text-muted)] mb-1">Observed source examples</p>
+                      <div className="flex flex-wrap gap-1">
+                        {group.observed_domains.map((d, j) => (
+                          <span key={j} className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2 py-1 text-xs text-[var(--text-secondary)]">{d}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <p className="typo-meta text-[var(--accent-blue)] mb-0.5">Recommended pitch</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{group.pitch_angle}</p>
+                  </div>
+                  {group.proof_required.length > 0 && (
+                    <div>
+                      <p className="typo-meta text-amber-300 mb-0.5">Proof assets needed</p>
+                      <ul className="space-y-0.5">
+                        {group.proof_required.map((p, k) => (
+                          <li key={k} className="text-xs text-[var(--text-secondary)]">• {p}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Fallback: show flat publisher types and domains */
+            <>
+              <div className="flex flex-wrap gap-1">{pack.target_publisher_types.map((t, i) => <span key={i} className="rounded-full bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)]/20 px-2 py-1 text-xs text-[var(--accent-blue)]">{t.replace(/_/g, ' ')}</span>)}</div>
+              {pack.target_domains_observed.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-[var(--text-muted)] mt-2">Observed Domains</p>
+                  <div className="flex flex-wrap gap-1">{pack.target_domains_observed.map((d, i) => <span key={i} className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-1 text-xs text-[var(--text-secondary)]">{d}</span>)}</div>
+                </>
+              )}
+            </>
           )}
         </div>
       )}
@@ -438,22 +531,113 @@ function PrCardBody({ item }: { item: RecommendationModule }) {
         <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm text-[var(--text-muted)]">Publisher target data will be generated by the Bodhi PR workflow node.</div>
       )}
       {activeTab === 'triggers' && pack && (
-        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 space-y-2">
-          <p className="typo-meta text-[var(--text-muted)]">Semantic Triggers</p>
-          <div className="flex flex-wrap gap-1">{pack.semantic_triggers.map((t, i) => <span key={i} className="rounded-full bg-purple-500/10 border border-purple-500/20 px-2 py-1 text-xs text-purple-400">{t.replace(/_/g, ' ')}</span>)}</div>
+        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-4 space-y-4">
+          <p className="typo-meta text-[var(--text-muted)]">AI Answer Hooks — semantic triggers grouped by theme</p>
+          {/* Render semantic_trigger_groups if available from LLM */}
+          {pack.semantic_trigger_groups && pack.semantic_trigger_groups.length > 0 ? (
+            <div className="space-y-3">
+              {pack.semantic_trigger_groups.map((group, i) => (
+                <div key={i} className="rounded-[var(--radius-sm)] border border-purple-500/20 bg-purple-500/5 p-3 space-y-2">
+                  <p className="text-sm font-semibold text-purple-400">{group.theme}</p>
+                  <div>
+                    <p className="typo-meta text-[var(--text-muted)] mb-1">Trigger terms</p>
+                    <div className="flex flex-wrap gap-1">
+                      {group.triggers.map((t, j) => (
+                        <span key={j} className="rounded-full bg-purple-500/10 border border-purple-500/20 px-2 py-1 text-xs text-purple-400">{t.replace(/_/g, ' ')}</span>
+                      ))}
+                    </div>
+                  </div>
+                  {group.required_evidence.length > 0 && (
+                    <div>
+                      <p className="typo-meta text-amber-300 mb-0.5">Required proof</p>
+                      <ul className="space-y-0.5">
+                        {group.required_evidence.map((e, k) => (
+                          <li key={k} className="text-xs text-[var(--text-secondary)]">• {e}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Fallback: show flat trigger chips */
+            <div className="flex flex-wrap gap-1">{pack.semantic_triggers.map((t, i) => <span key={i} className="rounded-full bg-purple-500/10 border border-purple-500/20 px-2 py-1 text-xs text-purple-400">{t.replace(/_/g, ' ')}</span>)}</div>
+          )}
         </div>
       )}
       {activeTab === 'triggers' && !pack && (
         <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm text-[var(--text-muted)]">Semantic trigger data will be generated by the Bodhi PR workflow node.</div>
       )}
       {activeTab === 'requirements' && pack && (
-        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 space-y-2">
-          <p className="typo-meta text-[var(--text-muted)]">Publisher Format Requirements</p>
-          <ul className="space-y-1">{pack.publisher_format_requirements.map((r, i) => <li key={i} className="text-xs text-[var(--text-secondary)]">• {r.replace(/_/g, ' ')}</li>)}</ul>
+        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-4 space-y-4">
+          <p className="typo-meta text-[var(--text-muted)]">PR Production Checklist</p>
+          {/* Mandatory brand data */}
+          {(pack.brand_data_required?.length || pack.unique_brand_data_required?.length) ? (
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-primary)] mb-1">Mandatory brand data</p>
+              <ul className="space-y-0.5">
+                {(pack.brand_data_required || pack.unique_brand_data_required || []).map((d, i) => (
+                  <li key={i} className="text-xs text-[var(--text-secondary)]">• {d.replace(/_/g, ' ')}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {/* Legal / compliance checks */}
+          {pack.legal_review_required && pack.legal_review_required.length > 0 ? (
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-primary)] mb-1">Legal / compliance checks</p>
+              <ul className="space-y-0.5">
+                {pack.legal_review_required.map((r, i) => (
+                  <li key={i} className="text-xs text-[var(--text-secondary)]">• {r}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-primary)] mb-1">Legal / compliance checks</p>
+              <ul className="space-y-0.5">
+                <li className="text-xs text-[var(--text-secondary)]">• No unsupported comparison claims</li>
+                <li className="text-xs text-[var(--text-secondary)]">• No stale incentive values</li>
+                <li className="text-xs text-[var(--text-secondary)]">• All numeric claims source-linked</li>
+                <li className="text-xs text-[var(--text-secondary)]">• All competitor references neutral</li>
+              </ul>
+            </div>
+          )}
+          {/* Distribution assets */}
+          <div>
+            <p className="text-xs font-semibold text-[var(--text-primary)] mb-1">Distribution assets</p>
+            <ul className="space-y-0.5">
+              {pack.publisher_format_requirements.map((r, i) => (
+                <li key={i} className="text-xs text-[var(--text-secondary)]">• {r.replace(/_/g, ' ')}</li>
+              ))}
+            </ul>
+          </div>
+          {/* Measurement */}
+          {pack.measurement_plan && pack.measurement_plan.length > 0 ? (
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-primary)] mb-1">Measurement</p>
+              <ul className="space-y-0.5">
+                {pack.measurement_plan.map((m, i) => (
+                  <li key={i} className="text-xs text-[var(--text-secondary)]">• {m}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs font-semibold text-[var(--text-primary)] mb-1">Measurement</p>
+              <ul className="space-y-0.5">
+                <li className="text-xs text-[var(--text-secondary)]">• Track external citations mentioning the brand</li>
+                <li className="text-xs text-[var(--text-secondary)]">• Track source type mix</li>
+                <li className="text-xs text-[var(--text-secondary)]">• Track linked query visibility score</li>
+                <li className="text-xs text-[var(--text-secondary)]">• Track whether AI answers cite new proof asset</li>
+              </ul>
+            </div>
+          )}
         </div>
       )}
       {activeTab === 'requirements' && !pack && (
-        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm text-[var(--text-muted)]">Publisher format requirements will be generated by the Bodhi PR workflow node.</div>
+        <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-sm text-[var(--text-muted)]">PR production checklist will be generated by the Bodhi PR workflow node.</div>
       )}
     </div>
   );

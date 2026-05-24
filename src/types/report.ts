@@ -168,6 +168,20 @@ export interface AdvancedGeoAsset {
   legal_review_required: boolean;
 }
 
+export interface PrPublisherGroup {
+  group: string;
+  why_it_matters: string;
+  observed_domains: string[];
+  pitch_angle: string;
+  proof_required: string[];
+}
+
+export interface PrSemanticTriggerGroup {
+  theme: string;
+  triggers: string[];
+  required_evidence: string[];
+}
+
 export interface AdvancedPrAssetPack {
   schema_version: 'advanced_pr_asset_pack.v1';
   asset_name: string;
@@ -187,6 +201,17 @@ export interface AdvancedPrAssetPack {
   proof_gap_addressed?: string;
   example_pitch_headline?: string;
   priority_queries?: string[];
+  // New PR action brief fields
+  insight_summary?: string;
+  recommended_pr_action?: string;
+  core_claim_to_prove?: string;
+  asset_concept?: string;
+  publishable_assets?: string[];
+  publisher_groups?: PrPublisherGroup[];
+  semantic_trigger_groups?: PrSemanticTriggerGroup[];
+  brand_data_required?: string[];
+  legal_review_required?: string[];
+  measurement_plan?: string[];
 }
 
 export interface RecommendationModule {

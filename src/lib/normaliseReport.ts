@@ -248,24 +248,56 @@ export function normaliseReport(raw: any): ReportBundle {
   }));
 
   // PR opportunities (grouped)
-  const prOpportunities: RecommendationModule[] = arr(r.grouped_pr_opportunities || r.pr_opportunities || r.prOpportunities).map((r: any): RecommendationModule => ({
-    title: str(r.title || r.recommended_pr_action),
-    targetUrl: str(r.target_url || r.targetUrl || ''),
-    recommendation: str(r.recommendation || r.recommended_pr_action),
-    evidencePattern: str(r.evidencePattern || r.evidence_pattern || r.winning_pattern_to_copy || ''),
-    priority: r.priority || 'Medium',
-    owner: str(r.owner),
-    journeyCategory: str(r.journey_category || r.journeyCategory) || undefined,
-    moduleType: str(r.opportunity_type || r.moduleType) || undefined,
-    whyItMatters: str(r.why_it_matters || r.whyItMatters) || undefined,
-    valueScore: num(r.value_score ?? r.valueScore) || undefined,
-    queryCoverageCount: num(r.query_coverage_count ?? r.queryCoverageCount) || undefined,
-    linkedQueryIds: arr(r.grouped_queries || r.linkedQueryIds || r.linked_query_ids).map((q: any) => typeof q === 'object' ? str(q.query_id) : str(q)),
-    targetSourceTypes: arr(r.target_source_types || r.targetSourceTypes),
-    observedExternalDomains: arr(r.observed_external_domains || r.observedExternalDomains || r.target_domains_observed).map((d: any) => typeof d === 'string' ? { domain: d } : { domain: str(d.domain), count: num(d.count) || undefined }),
-    sourceType: str(r.source_type || r.sourceType) || undefined,
-    advancedPrAssetPack: (r.advanced_pr_asset_pack || r.advancedPrAssetPack) as RecommendationModule['advancedPrAssetPack'],
-  }));
+  const prOpportunities: RecommendationModule[] = arr(r.grouped_pr_opportunities || r.pr_opportunities || r.prOpportunities).map((r: any): RecommendationModule => {
+    // Normalise the advanced PR asset pack with new action brief fields
+    const rawPack = r.advanced_pr_asset_pack || r.advancedPrAssetPack;
+    const advancedPrAssetPack = rawPack ? {
+      ...rawPack,
+      // Ensure new PR action brief fields are passed through
+      insight_summary: str(rawPack.insight_summary) || undefined,
+      recommended_pr_action: str(rawPack.recommended_pr_action) || undefined,
+      core_claim_to_prove: str(rawPack.core_claim_to_prove) || undefined,
+      asset_concept: str(rawPack.asset_concept) || undefined,
+      publishable_assets: arr(rawPack.publishable_assets),
+      publisher_groups: arr(rawPack.publisher_groups).map((g: any) => ({
+        group: str(g.group),
+        why_it_matters: str(g.why_it_matters),
+        observed_domains: arr(g.observed_domains),
+        pitch_angle: str(g.pitch_angle),
+        proof_required: arr(g.proof_required),
+      })),
+      semantic_trigger_groups: arr(rawPack.semantic_trigger_groups).map((g: any) => ({
+        theme: str(g.theme),
+        triggers: arr(g.triggers),
+        required_evidence: arr(g.required_evidence),
+      })),
+      brand_data_required: arr(rawPack.brand_data_required),
+      legal_review_required: arr(rawPack.legal_review_required),
+      measurement_plan: arr(rawPack.measurement_plan),
+    } as RecommendationModule['advancedPrAssetPack'] : undefined;
+
+    // Use insight-led title from pack if available, otherwise fall back to generic title
+    const insightTitle = rawPack?.insight_summary ? str(rawPack.insight_summary).slice(0, 120) : '';
+
+    return {
+      title: insightTitle || str(r.title || r.recommended_pr_action),
+      targetUrl: str(r.target_url || r.targetUrl || ''),
+      recommendation: str(rawPack?.recommended_pr_action || r.recommendation || r.recommended_pr_action),
+      evidencePattern: str(r.evidencePattern || r.evidence_pattern || r.winning_pattern_to_copy || ''),
+      priority: r.priority || 'Medium',
+      owner: str(r.owner),
+      journeyCategory: str(r.journey_category || r.journeyCategory) || undefined,
+      moduleType: str(r.opportunity_type || r.moduleType) || undefined,
+      whyItMatters: str(r.why_it_matters || r.whyItMatters) || undefined,
+      valueScore: num(r.value_score ?? r.valueScore) || undefined,
+      queryCoverageCount: num(r.query_coverage_count ?? r.queryCoverageCount) || undefined,
+      linkedQueryIds: arr(r.grouped_queries || r.linkedQueryIds || r.linked_query_ids).map((q: any) => typeof q === 'object' ? str(q.query_id) : str(q)),
+      targetSourceTypes: arr(r.target_source_types || r.targetSourceTypes),
+      observedExternalDomains: arr(r.observed_external_domains || r.observedExternalDomains || r.target_domains_observed).map((d: any) => typeof d === 'string' ? { domain: d } : { domain: str(d.domain), count: num(d.count) || undefined }),
+      sourceType: str(r.source_type || r.sourceType) || undefined,
+      advancedPrAssetPack,
+    };
+  });
 
   // Action checklist
   const actionChecklist: ActionItem[] = arr(r.action_checklist || r.actionChecklist).map((a: any): ActionItem => ({
