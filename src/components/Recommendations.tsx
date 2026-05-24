@@ -99,6 +99,8 @@ function RecommendationPanel({ title, eyebrow, items, type, highlightUrl }: { ti
   const [priority, setPriority] = useState('All');
   const [journey, setJourney] = useState('All');
   const [sortBy, setSortBy] = useState('priority');
+  const [cardPage, setCardPage] = useState(0);
+  const CARDS_PER_PAGE = 1;
   const journeys = useMemo(() => unique(items.map((item) => item.journeyCategory ?? '')), [items]);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -118,34 +120,53 @@ function RecommendationPanel({ title, eyebrow, items, type, highlightUrl }: { ti
     });
   }, [items, search, priority, journey, sortBy]);
 
+  // Reset page when filters change
+  useEffect(() => { setCardPage(0); }, [search, priority, journey, sortBy]);
+
   useEffect(() => {
     if (!highlightUrl) return;
-    const node = document.getElementById(`cms-${encodeURIComponent(highlightUrl)}`);
-    node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [highlightUrl, filtered.length]);
+    const idx = filtered.findIndex((item) => item.targetUrl === highlightUrl);
+    if (idx >= 0) setCardPage(idx);
+  }, [highlightUrl, filtered]);
+
+  const totalCardPages = Math.ceil(filtered.length / CARDS_PER_PAGE);
+  const pagedItems = filtered.slice(cardPage * CARDS_PER_PAGE, (cardPage + 1) * CARDS_PER_PAGE);
 
   return (
     <Card>
-      <SectionTitle eyebrow={eyebrow} title={`${title} · showing ${filtered.length}`}>
+      <SectionTitle eyebrow={eyebrow} title={`${title} \u00b7 showing ${filtered.length}`}>
         {type === 'cms'
           ? 'Content recommendations are tracked at owned-page level. Each card aggregates linked queries and shows copy-ready modules for the highest-value page changes.'
           : 'PR & Brand Insights are tracked separately from owned URLs. Each card groups queries by external source pattern and prioritises opportunities that can influence multiple queries.'}
       </SectionTitle>
       <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder={type === 'cms' ? 'Search page, module, query ID...' : 'Search source type, domain, query ID...'} value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={priority} onChange={(event) => setPriority(event.target.value)}>
+        <input className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" placeholder={type === 'cms' ? 'Search page, module, query ID...' : 'Search source type, domain, query ID...'} value={search} onChange={(event) => { setSearch(event.target.value); setCardPage(0); }} />
+        <select className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" value={priority} onChange={(event) => setPriority(event.target.value)}>
           <option>All</option><option>High</option><option>Medium</option><option>Low</option>
         </select>
-        <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={journey} onChange={(event) => setJourney(event.target.value)}>
+        <select className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" value={journey} onChange={(event) => setJourney(event.target.value)}>
           <option>All</option>{journeys.map((item) => <option key={item}>{item}</option>)}
         </select>
-        <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+        <select className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
           <option value="priority">Sort: priority</option><option value="coverage">Sort: query coverage</option><option value="value">Sort: value score</option><option value="journey">Sort: journey</option><option value="title">Sort: title</option>
         </select>
       </div>
       <div className="space-y-4">
-        {filtered.length ? filtered.map((item) => <RecommendationCard key={`${item.sourceRecommendationId}-${item.title}-${item.targetUrl}`} item={item} type={type} highlighted={!!highlightUrl && item.targetUrl === highlightUrl} />) : <p className="text-sm text-slate-500">No {title.toLowerCase()} match the current filters.</p>}
+        {pagedItems.length ? pagedItems.map((item) => <RecommendationCard key={`${item.sourceRecommendationId}-${item.title}-${item.targetUrl}`} item={item} type={type} highlighted={!!highlightUrl && item.targetUrl === highlightUrl} />) : <p className="text-sm text-[var(--text-muted)]">No {title.toLowerCase()} match the current filters.</p>}
       </div>
+      {/* Pagination controls */}
+      {totalCardPages > 1 && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-xs text-[var(--text-muted)]">
+            Card {cardPage + 1} of {totalCardPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <DarkButton onClick={() => setCardPage((p) => Math.max(0, p - 1))} disabled={cardPage === 0}>Previous</DarkButton>
+            <span className="text-xs text-[var(--text-secondary)]">{cardPage + 1} / {totalCardPages}</span>
+            <DarkButton onClick={() => setCardPage((p) => Math.min(totalCardPages - 1, p + 1))} disabled={cardPage >= totalCardPages - 1}>Next</DarkButton>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
