@@ -233,6 +233,18 @@ export function normaliseReport(raw: any): ReportBundle {
     intentTags: arr(r.intent_tags || r.intentTags).map((t: any) => str(t)),
     advancedGeoAsset: (r.advanced_geo_asset || r.advancedGeoAsset) as RecommendationModule['advancedGeoAsset'],
     advancedPrAssetPack: (r.advanced_pr_asset_pack || r.advancedPrAssetPack) as RecommendationModule['advancedPrAssetPack'],
+    // CMS LLM merge fields
+    cms_llm_merged: bool(r.cms_llm_merged),
+    copyModules: arr(r.copy_modules || r.copyModules).map((m: any) => ({
+      moduleId: str(m.module_id || m.moduleId),
+      moduleType: str(m.module_type || m.moduleType) || undefined,
+      recommendedPlacement: str(m.recommended_placement || m.recommendedPlacement) || undefined,
+      heading: str(m.heading),
+      introCopy: str(m.intro_copy || m.introCopy),
+      bodyCopy: str(m.body_copy || m.bodyCopy),
+      bullets: arr(m.bullets),
+      faqItems: arr(m.faq_items || m.faqItems).filter((f: any) => f && (f.question || f.answer)),
+    })),
   }));
 
   // PR opportunities (grouped)

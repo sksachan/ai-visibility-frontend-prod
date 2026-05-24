@@ -123,8 +123,10 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
   const [activeTab, setActiveTab] = useState<'brief' | 'jsonld' | 'facts' | 'faq'>('brief');
   const tabList = ['brief', 'jsonld', 'facts', 'faq'] as const;
   const tabLabels = { brief: 'Brief', jsonld: 'JSON-LD', facts: 'Facts Verified on Page', faq: 'FAQ' };
-  // Collect direct answer: prefer LLM-merged field, then advanced asset, then deterministic fallback
-  const directAnswer = item.directAnswer || (asset?.direct_answer_40_words) || '';
+  // Collect direct answer: prefer LLM-merged field first.
+  // Only fall back to advancedGeoAsset.direct_answer_40_words if NO LLM module exists for this card.
+  // Do NOT use advancedGeoAsset fallback if an LLM module existed but failed to merge — that hides the real issue.
+  const directAnswer = item.directAnswer || (isCmsLlmMerged ? '' : (asset?.direct_answer_40_words || ''));
   const primaryQueryId = item.primaryQueryId || item.linkedQueryIds?.[0] || '';
   const primaryQueryText = item.primaryQueryText || '';
   const isCmsLlmMerged = !!item.cms_llm_merged;
