@@ -158,7 +158,7 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <DarkButton variant={graphView === 'scatter' ? 'primary' : 'default'} onClick={() => setGraphView('scatter')}>Scatter plot</DarkButton>
           <DarkButton variant={graphView === 'journeyShare' ? 'primary' : 'default'} onClick={() => setGraphView('journeyShare')}>Source type % by brand topics</DarkButton>
-          <DarkButton variant={graphView === 'sentimentShare' ? 'primary' : 'default'} onClick={() => setGraphView('sentimentShare')}>Sentiment % by brand topics</DarkButton>
+          <DarkButton variant={graphView === 'sentimentShare' ? 'primary' : 'default'} onClick={() => setGraphView('sentimentShare')}>Brand sentiment by topic</DarkButton>
           {graphView === 'scatter' && (
             <>
               <span className="text-xs text-[var(--text-muted)] mx-1">|</span>
@@ -256,46 +256,112 @@ export function VisibilityMatrix({ report }: { report: ReportBundle }) {
         )}
 
         {graphView === 'sentimentShare' && (() => {
-          // Build sentiment data: axes = sentiment types, lines = journey categories
-          const sentimentTypes = ['positive', 'neutral', 'negative', 'mixed'] as const;
-          const sentimentPalette = ['#00c758', '#9f9f9f', '#ff6568', '#ffea35'];
-          const journeySentiment: Record<string, Record<string, number>> = {};
+          // 100% stacked horizontal bar chart by brand topic
+          // Y-axis = journey_category / brand topic
+          // X-axis = 0% to 100%
+          // Segments = positive (green), neutral (slate), negative (red), mixed (amber)
+          const sentimentColors = { positive: '#00c758', neutral: '#64748b', negative: '#ff6568', mixed: '#ffea35' };
+          const journeySentiment: Record<string, { positive: number; neutral: number; negative: number; mixed: number; total: number }> = {};
           (report.queryWorkbench ?? []).forEach((q) => {
-            const journey = q.journey_category || 'Unclassified';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const qAny = q as any;
+            const journey: string = qAny.journey_category || qAny.journeyCategory || qAny.journey || 'Unclassified';
             if (journey === 'Unclassified') return;
             const vis = q.current_ai_visibility;
             if (!vis?.brand_mentioned) return;
             if (!journeySentiment[journey]) journeySentiment[journey] = { positive: 0, neutral: 0, negative: 0, mixed: 0, total: 0 };
-            const s = vis.brand_sentiment || 'neutral';
+            const s = (vis.brand_sentiment || 'neutral') as keyof typeof sentimentColors;
             if (s in journeySentiment[journey]) journeySentiment[journey][s]++;
             journeySentiment[journey].total++;
           });
-          const journeys = Object.keys(journeySentiment).filter(j => journeySentiment[j].total > 0).slice(0, 8);
-          if (!journeys.length) return <div className="h-[28rem] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 flex items-center justify-center"><Empty>No brand sentiment data available. Brand must be mentioned in AI answers for sentiment analysis.</Empty></div>;
-          const chartData = sentimentTypes.map((st) => {
-            const row: Record<string, unknown> = { sentiment: st.charAt(0).toUpperCase() + st.slice(1) };
-            journeys.forEach((j) => {
-              const total = journeySentiment[j].total || 1;
-              row[j] = Math.round((journeySentiment[j][st] / total) * 100 * 10) / 10;
-            });
-            return row;
+          const journeys = Object.entries(journeySentiment)
+            .filter(([, data]) => data.total > 0)
+            .sort((a, b) => b[1].total - a[1].total);
+          if (!journeys.length) return (
+            <div className="h-[28rem] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 flex items-center justify-center">
+              <Empty>No brand sentiment data available. Brand must be mentioned in AI answers for sentiment analysis.</Empty>
+            </div>
+          );
+          // Build 100% stacked horizontal bar data
+          const chartData = journeys.map(([topic, data]) => {
+            const total = data.total || 1;
+            return {
+              topic,
+              positive: Math.round((data.positive / total) * 100 * 10) / 10,
+              neutral: Math.round((data.neutral / total) * 100 * 10) / 10,
+              negative: Math.round((data.negative / total) * 100 * 10) / 10,
+              mixed: Math.round((data.mixed / total) * 100 * 10) / 10,
+              positiveCount: data.positive,
+              neutralCount: data.neutral,
+              negativeCount: data.negative,
+              mixedCount: data.mixed,
+              total: data.total,
+            };
           });
+          const barHeight = Math.max(280, journeys.length * 48 + 80);
           return (
-            <div className="h-[28rem] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
-              <p className="mb-2 text-xs text-[var(--text-muted)]">Brand sentiment share (%) by journey categories. Each bar segment shows positive/neutral/negative/mixed share.</p>
-              <ResponsiveContainer width="100%" height="95%">
-                <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                  <XAxis dataKey="sentiment" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
-                  <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fill: 'var(--text-muted)' }} />
-                  <Tooltip content={({ active, payload, label: sentLabel }) => {
-                    if (!active || !payload?.length) return null;
-                    return (<div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3 text-sm shadow-lg"><p className="font-semibold text-[var(--text-primary)] mb-1">{sentLabel}</p>{payload.map((p) => (<p key={String(p.dataKey)} className="text-[var(--text-secondary)]"><span style={{ color: p.color }}>{"\u25CF"}</span> {String(p.name)}: {p.value}%</p>))}</div>);
-                  }} />
-                  {journeys.map((j, i) => <Bar key={j} dataKey={j} name={j} fill={palette[i % palette.length]} stackId="sentiment" />)}
-                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-secondary)' }} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
+              <p className="mb-3 text-sm text-[var(--text-secondary)]">
+                Sentiment distribution for AI answers where the brand is mentioned.
+              </p>
+              <div style={{ height: barHeight }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" horizontal={false} />
+                    <XAxis type="number" domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+                    <YAxis
+                      type="category"
+                      dataKey="topic"
+                      width={180}
+                      tick={(props: Record<string, unknown>) => {
+                        const xPos = Number(props.x) || 0;
+                        const yPos = Number(props.y) || 0;
+                        const payloadObj = props.payload as { value?: string } | undefined;
+                        const topicName = payloadObj?.value ?? '';
+                        const d = chartData.find((r) => r.topic === topicName);
+                        const sampleLabel = d ? `n=${d.total}` : '';
+                        return (
+                          <g transform={`translate(${xPos},${yPos})`}>
+                            <text x={-4} y={-4} textAnchor="end" fill="var(--text-secondary)" fontSize={11}>{topicName}</text>
+                            <text x={-4} y={10} textAnchor="end" fill="var(--text-muted)" fontSize={9}>{sampleLabel}</text>
+                          </g>
+                        );
+                      }}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0]?.payload;
+                        if (!d) return null;
+                        return (
+                          <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3 text-sm shadow-lg min-w-[200px]">
+                            <p className="font-semibold text-[var(--text-primary)] mb-2">{d.topic}</p>
+                            <p className="text-xs text-[var(--text-muted)] mb-2">Sample size: n={d.total}</p>
+                            {(['positive', 'neutral', 'negative', 'mixed'] as const).map((s) => (
+                              <p key={s} className="text-[var(--text-secondary)] flex items-center gap-1.5">
+                                <span style={{ color: sentimentColors[s], fontSize: 14 }}>{"\u25CF"}</span>
+                                <span className="capitalize">{s}:</span>
+                                <span className="font-semibold">{d[`${s}Count`]}</span>
+                                <span className="text-[var(--text-muted)]">({d[s]}%)</span>
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="positive" name="Positive" stackId="sentiment" fill={sentimentColors.positive} radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="neutral" name="Neutral" stackId="sentiment" fill={sentimentColors.neutral} />
+                    <Bar dataKey="negative" name="Negative" stackId="sentiment" fill={sentimentColors.negative} />
+                    <Bar dataKey="mixed" name="Mixed" stackId="sentiment" fill={sentimentColors.mixed} radius={[0, 4, 4, 0]} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: 'var(--text-secondary)' }} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {chartData.some((d) => d.total <= 2) && (
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  Topics with very low sample sizes (n=1, n=2) may not be statistically representative.
+                </p>
+              )}
             </div>
           );
         })()}
