@@ -29,6 +29,7 @@ export interface ReportHistoryRun {
   crawl_success_rate?: number;
   serpapi_enabled?: boolean;
   source_run_id?: string;
+  portfolio_id?: string;
   created_at_epoch?: number;
   completed_at_epoch?: number;
 }

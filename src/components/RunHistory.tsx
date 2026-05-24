@@ -108,6 +108,7 @@ export function RunHistory({ brand, market, onLoad }: { brand: string; market: s
               <tr key={row.run_id} className="align-top">
                 <td className="px-3 py-4">
                   <p className="font-mono text-xs text-[var(--text-primary)]">{row.run_id}</p>
+                  {row.portfolio_id && <p className="mt-1 font-mono text-[10px] text-[var(--text-muted)]" title="Query portfolio ID">Portfolio: {row.portfolio_id}</p>}
                   <p className="mt-1 text-xs text-[var(--text-muted)]">{formatEpoch(row.completed_at_epoch || row.created_at_epoch)}</p>
                   {row.brand && <p className="mt-1 text-xs font-semibold text-[var(--accent-blue)]">{row.brand} / {row.market}</p>}
                 </td>
