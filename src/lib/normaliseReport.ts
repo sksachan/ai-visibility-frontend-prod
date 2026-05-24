@@ -229,7 +229,7 @@ export function normaliseReport(raw: any): ReportBundle {
     faqItems: arr(r.faq_items || r.faqItems).filter((f: any) => f && (f.question || f.answer)),
     factsUsed: arr(r.facts_used || r.factsUsed),
     factsMissing: arr(r.facts_missing || r.factsMissing).map((f: any) => typeof f === 'string' ? f : str(f)),
-    jsonLdTags: arr(r.json_ld_tags || r.jsonLdTags).map((t: any) => str(t)),
+    jsonLdTags: arr(r.json_ld_tags || r.jsonLdTags).map((t: any) => (t && typeof t === 'object') ? t : str(t)),
     intentTags: arr(r.intent_tags || r.intentTags).map((t: any) => str(t)),
     advancedGeoAsset: (r.advanced_geo_asset || r.advancedGeoAsset) as RecommendationModule['advancedGeoAsset'],
     advancedPrAssetPack: (r.advanced_pr_asset_pack || r.advancedPrAssetPack) as RecommendationModule['advancedPrAssetPack'],
