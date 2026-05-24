@@ -63,16 +63,16 @@ export function Recommendations({ report }: { report: ReportBundle }) {
 export function CmsRecommendations({ report, highlightUrl }: { report: ReportBundle; highlightUrl?: string }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300 flex-1">
-          <p className="font-semibold">⚠️ Disclaimer</p>
-          <p className="mt-1">Please review each recommendation with your Brand, Content, and Legal teams before making any changes to live pages.</p>
-        </div>
+      <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300 flex items-center gap-2">
+        <span className="font-semibold">⚠ Disclaimer</span>
+        <span>Please review each recommendation with your Brand, Content, and Legal teams before making any changes to live pages.</span>
+      </div>
+      <RecommendationPanel title={`Content Insights \u2014 Page-level recommendations (${report.cmsModules.length})`} eyebrow="Content remediation" items={report.cmsModules} type="cms" highlightUrl={highlightUrl} />
+      <div className="flex justify-end">
         <DarkButton onClick={() => exportCmsModules(report.cmsModules)} disabled={!report.cmsModules.length}>
           <Download size={13} /> Export CSV
         </DarkButton>
       </div>
-      <RecommendationPanel title={`Content Insights \u2014 Page-level recommendations (${report.cmsModules.length})`} eyebrow="Content remediation" items={report.cmsModules} type="cms" highlightUrl={highlightUrl} />
     </div>
   );
 }
@@ -80,16 +80,16 @@ export function CmsRecommendations({ report, highlightUrl }: { report: ReportBun
 export function PrRecommendations({ report }: { report: ReportBundle }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300 flex-1">
-          <p className="font-semibold">⚠️ Disclaimer</p>
-          <p className="mt-1">Please review each PR recommendation with your Brand, Content, and Legal teams before executing any external outreach or asset creation.</p>
-        </div>
+      <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300 flex items-center gap-2">
+        <span className="font-semibold">⚠ Disclaimer</span>
+        <span>Please review each PR recommendation with your Brand, Content, and Legal teams before executing any external outreach or asset creation.</span>
+      </div>
+      <RecommendationPanel title={`PR & Brand Insights \u2014 Grouped opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" />
+      <div className="flex justify-end">
         <DarkButton onClick={() => exportPrModules(report.prOpportunities)} disabled={!report.prOpportunities.length}>
           <Download size={13} /> Export CSV
         </DarkButton>
       </div>
-      <RecommendationPanel title={`PR & Brand Insights \u2014 Grouped opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" />
     </div>
   );
 }
