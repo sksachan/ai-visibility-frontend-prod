@@ -127,7 +127,7 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
   const directAnswer = item.directAnswer || (asset?.direct_answer_40_words) || '';
   const primaryQueryId = item.primaryQueryId || item.linkedQueryIds?.[0] || '';
   const primaryQueryText = item.primaryQueryText || '';
-  const isCmsLlmMerged = !!(item as Record<string, unknown>).cms_llm_merged;
+  const isCmsLlmMerged = !!item.cms_llm_merged;
   const evidenceStatus = directAnswer && !directAnswer.includes('[Pending') && !directAnswer.includes('[Direct answer pending') ? 'verified' : 'needs validation';
   // Collect FAQ items from new schema fields, then copyModules, then item.faqItems
   const allFaqItems = (item.faqItems?.length ? item.faqItems : modules.flatMap((m) => m.faqItems || []));
@@ -214,12 +214,12 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
             <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3">
               <p className="typo-meta text-emerald-400 mb-2">Verified Facts ({item.factsUsed.length})</p>
               <div className="space-y-2">
-                {item.factsUsed.map((fact: Record<string, unknown>, i: number) => (
+                {item.factsUsed.map((fact, i) => (
                   <div key={i} className="rounded-[var(--radius-sm)] border border-emerald-500/25 bg-emerald-500/8 p-2 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent-success)]" />
                       <span className="font-semibold text-[var(--text-primary)]">{String(fact.fact || '')}</span>
-                      {fact.value && <span className="text-[var(--text-secondary)]">{String(fact.value)}{fact.unit ? ` ${fact.unit}` : ''}</span>}
+                      {fact.value && <span className="text-[var(--text-secondary)]">{String(fact.value)}{fact.unit ? ` ${String(fact.unit)}` : ''}</span>}
                     </div>
                     {fact.source && <p className="mt-1 text-[var(--text-muted)]">Source: <span className="font-semibold text-[var(--text-secondary)]">{String(fact.source).replace(/_/g, ' ')}</span></p>}
                     {fact.source_context_snippet && <p className="mt-0.5 text-[var(--text-muted)] break-all">Snippet: {String(fact.source_context_snippet).slice(0, 200)}</p>}

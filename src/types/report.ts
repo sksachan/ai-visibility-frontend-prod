@@ -210,8 +210,9 @@ export interface RecommendationModule {
   directAnswer?: string;
   factsUsed?: FactUsed[];
   factsMissing?: string[];
-  jsonLdTags?: string[];
+  jsonLdTags?: Array<string | Record<string, unknown>>;
   intentTags?: string[];
+  cms_llm_merged?: boolean;
   whyItMatters?: string;
   evidenceBasis?: string;
   targetSourceTypes?: string[];
