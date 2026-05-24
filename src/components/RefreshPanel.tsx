@@ -56,8 +56,12 @@ function wfKeyForStage(stage?: string): WfKey | null {
   if (s.startsWith('sitemap_')) return 'sitemap';
   if (s.startsWith('owned_url_mapping_')) return 'mapping';
   if (s.startsWith('serpapi_') || s.includes('ai_citation')) return 'ai_citations';
-  if (s.includes('crawl') || s === 'evidence_ready') return 'crawls';
-  if (s.startsWith('auditor_')) return 'auditor';
+  if (s.includes('crawl')) return 'crawls';
+  // evidence_ready means crawls are done and we're waiting for auditor — show crawls as done
+  if (s === 'evidence_ready') return 'auditor';
+  // Match all auditor-related stages including auditor_run_created, auditor_ui_hitl_*,
+  // auditor_queued, auditor_running, auditor_completed, auditor_failed
+  if (s.startsWith('auditor_') || s.startsWith('bodhi_auditor') || s === 'auditor') return 'auditor';
   if (s === 'report_bundle_ready' || terminalStages.has(s)) return 'report_ready';
   return null;
 }
@@ -190,10 +194,44 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
   const isStatusFailed = status?.status === 'failed';
   const isFailed = failedStages.has(currentStage) || currentStage.endsWith('_failed') || hasErrorMessage || isStatusFailed;
   const isDone = !isFailed && (currentStage === 'report_bundle_ready' || terminalStages.has(currentStage));
+  // Determine if the backend is actively processing (not just that we have a status object)
+  const isActivelyRunning = Boolean(status?.active) && !isFailed && !isDone;
 
   async function checkStatus() {
     setIsChecking(true); setError('');
-    try { const next = await fetchRefreshStatus(brand, market, trackedRunId || undefined); const nextRunId = runIdFrom(next, trackedRunId) || valueFromRaw(next.raw, ['run_id', 'target_run_id', 'evidence_run_id']); if (nextRunId) setTrackedRunId(nextRunId); setStatus(next); }
+    try {
+      // First, always query by brand/market to discover the latest active run.
+      // This ensures we pick up new runs even if we were tracking an old failed one.
+      const brandMarketStatus = await fetchRefreshStatus(brand, market);
+
+      // If the brand/market query found an active run, use that run's ID.
+      // This handles the case where a new run started after a previous failure.
+      const activeRunId = brandMarketStatus.active
+        ? (brandMarketStatus.runId || brandMarketStatus.targetRunId || '')
+        : '';
+
+      // If there's an active run from brand/market query, track that one.
+      // If no active run but we have a tracked ID, query that specific run for its final status.
+      // If no active run and no tracked ID, just use the brand/market status.
+      let finalStatus = brandMarketStatus;
+      if (activeRunId && activeRunId !== trackedRunId) {
+        // New active run discovered - switch to tracking it
+        setTrackedRunId(activeRunId);
+      } else if (!brandMarketStatus.active && trackedRunId) {
+        // No active run from brand/market, but we have a tracked ID.
+        // Query the specific run to get its final status (completed/failed).
+        try {
+          const specificStatus = await fetchRefreshStatus(brand, market, trackedRunId);
+          finalStatus = specificStatus;
+        } catch {
+          // If specific run query fails, fall back to brand/market status
+        }
+      }
+
+      const nextRunId = activeRunId || runIdFrom(finalStatus, trackedRunId) || valueFromRaw(finalStatus.raw, ['run_id', 'target_run_id', 'evidence_run_id']);
+      if (nextRunId) setTrackedRunId(nextRunId);
+      setStatus(finalStatus);
+    }
     catch (err) { setError(err instanceof Error ? err.message : String(err)); } finally { setIsChecking(false); }
   }
 
@@ -223,29 +261,52 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
         <SectionHeader eyebrow="Workflow Status" title={statusText(status, trackedRunId)} />
         <div className="flex flex-wrap gap-2">
           {workflowStages.map((stage, index) => {
-            // When idle (no active run), all stages should show as pending (waiting to start)
-            // When running, show done/active/pending based on current stage
-            // When completed/done, show all stages as done
+            // State logic:
+            // 1. Failed: the stage that failed shows red
+            // 2. Done (all complete): all stages green
+            // 3. Actively running: stages before current = done, current = active, after = pending
+            // 4. Idle (no active run, no status): all pending
             let state: 'pending' | 'active' | 'done' | 'failed';
-            if (!status?.active && !isDone) {
-              // Idle state - no active run, show all as pending
-              state = 'pending';
-            } else if (isFailed && currentWfKey === stage.key) {
-              state = 'failed';
+            if (isFailed) {
+              // Show stages before failed stage as done, failed stage as failed, rest as pending
+              if (currentWfKey === stage.key) {
+                state = 'failed';
+              } else if (wfIdx >= 0 && index < wfIdx) {
+                state = 'done';
+              } else {
+                state = 'pending';
+              }
             } else if (isDone) {
               state = 'done';
-            } else if (wfIdx >= 0 && index < wfIdx) {
-              state = 'done';
-            } else if (currentWfKey === stage.key) {
-              state = 'active';
+            } else if (isActivelyRunning && wfIdx >= 0) {
+              // Backend is actively processing - show progress
+              if (index < wfIdx) {
+                state = 'done';
+              } else if (currentWfKey === stage.key) {
+                state = 'active';
+              } else {
+                state = 'pending';
+              }
             } else {
+              // Idle or status not yet loaded
               state = 'pending';
             }
             return <WorkflowStage key={stage.key} label={stage.label} state={state} />;
           })}
         </div>
-        {status?.active && trackedRunId && <p className="mt-3 text-xs font-mono text-[var(--accent-blue)]">Currently running: {trackedRunId}</p>}
-        {!status?.active && trackedRunId && <p className="mt-3 text-xs font-mono text-[var(--text-muted)]">Last tracked: {trackedRunId}</p>}
+        {isActivelyRunning && (status?.runId || trackedRunId) && (
+          <p className="mt-3 text-xs font-mono text-[var(--accent-blue)]">
+            Currently running: {status?.runId || trackedRunId}
+          </p>
+        )}
+        {isFailed && (status?.runId || trackedRunId) && (
+          <p className="mt-3 text-xs font-mono text-[var(--accent-danger)]">
+            Failed: {status?.runId || trackedRunId}{status?.errorMessage ? ` — ${status.errorMessage}` : ''}
+          </p>
+        )}
+        {!isActivelyRunning && !isFailed && !isDone && trackedRunId && (
+          <p className="mt-3 text-xs font-mono text-[var(--text-muted)]">Last tracked: {trackedRunId}</p>
+        )}
         <div className="mt-3 flex gap-2">
           <DarkButton onClick={() => void checkStatus()} disabled={isChecking}><RefreshCcw size={13} /> {isChecking ? 'Checking...' : 'Check status'}</DarkButton>
         </div>
