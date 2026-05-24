@@ -1,111 +1,455 @@
-import { WorkspacePanel, SectionHeader } from './ui';
+import { useState } from 'react';
+import { BookOpen, Layers, BarChart3, Compass, BookText, HelpCircle, AlertTriangle, Cpu } from 'lucide-react';
+import { WorkspacePanel, SectionHeader, DarkButton } from './ui';
 
-const sections = [
-  {
-    title: '1. How to interpret the dashboard',
-    summary: 'The dashboard is an evidence-to-action workspace for managing AI brand visibility across search and generative AI answer experiences.',
-    items: [
-      ['Executive Report', 'Start here. It shows the headline AI Visibility Score (0\u2013100), brand topic scorecard with competitor benchmarking, priority actions, and AI discoverability hygiene status. Use it for CMO and senior stakeholder readouts.'],
-      ['AEO Insights: Query Workbench', 'Validates each audited query. Shows query intent, journey stage, visibility status (owned target cited, owned domain cited, external led, competitor led, not observed), competitors detected, citation domains, winning source patterns, and mapped owned URLs with GEO scores.'],
-      ['AEO Insights: Source Landscape', 'Visualises the citation layer: which external domains and source types are shaping AI answers, their share of mix (percentage or count), and captured citation evidence with pagination.'],
-      ['GEO Insights: Owned URL Readiness', 'Prioritise page-level GEO remediation. Features a waterfall chart showing average dimension contributions to GEO Score, a radar comparison by brand topics, and a paginated table with per-page scores, dimension breakdowns, technical signals, and query mappings.'],
-      ['Content Alignment (CMS)', 'Convert diagnosis into page-level content changes. Each recommendation includes a brief, JSON-LD suggestions, verified facts from the page, and FAQ generation. All recommendations should be validated by Brand, Content, and Legal teams before implementation.'],
-      ['PR & Brand Suggestions', 'Grouped by external source pattern and query cluster. Shows publisher targets, semantic triggers, asset packs, and briefing copy. PR actions are not tied to owned URLs.'],
-      ['Action Checklist', 'Consolidated actions by owner, effort, priority, and workstream. Tracks CMS page optimisation and PR/external proof actions with linked query coverage.'],
-    ]
-  },
-  {
-    title: '2. Scoring systems explained',
-    summary: 'The platform uses two independent scoring systems: AI Visibility Score (query-level) and GEO Readiness Score (page-level).',
-    items: [
-      ['AI Visibility Score (0\u2013100)', 'Estimates how strongly the brand is represented in AI answers for each audited query. Calculated from: owned target-page citation (+55), owned domain citation (+30), absence of competitors (+15), external citation evidence (+20 max), with penalties for competitor presence (-15) and external dependency (-8). Scores are comparable across runs using the same query portfolio.'],
-      ['GEO Readiness Score (0\u2013120)', 'Measures whether an owned page is likely to be extracted, cited, or used by AI answer systems. This is a page-intrinsic score computed from crawl evidence, independent of query mapping. Six dimensions, each scored 0\u201320.'],
-      ['Content Clarity (0\u201320)', 'Rewards direct, extractable sections with clear headings, concise answer blocks, title presence, meta description, word count \u2265300, and \u22652 headings.'],
-      ['Semantic Depth (0\u201320)', 'Rewards useful coverage of subtopics, comparisons, constraints, trade-offs. Scored on word count thresholds (600, 1200), numeric evidence count, and heading structure.'],
-      ['Structured Data (0\u201320)', 'Rewards JSON-LD/schema presence (+12 for JSON-LD detected) and schema type diversity (+3 per type, max 8). Does not over-score pages solely because schema exists.'],
-      ['E-E-A-T Signals (0\u201320)', 'Rewards proof points, dates, specifications, warranties, source-backed claims. Scored on proof term frequency, numeric evidence, and freshness indicators.'],
-      ['Freshness Index (0\u201320)', 'Rewards visible recency cues, update dates, current policy/specification references. Bonus for canonical URL presence.'],
-      ['FAQ Readiness (0\u201320)', 'Rewards extractable question-answer blocks. Scored on question mark frequency, FAQ mentions, and structured Q&A patterns.'],
-      ['Fallback scoring', 'When full markdown crawl text is unavailable, a limited fallback score uses only metadata and technical signals (title, canonical URL, JSON-LD/schema). These are labelled as "Fallback" and should be treated as lower-confidence until the page is recrawled.'],
-      ['Value Score (CMS/PR)', 'Internal prioritisation metric for recommendations. Calculated from query coverage count, visibility gap severity, evidence value from winning patterns, and GEO gap analysis. Higher value score = higher implementation priority.'],
-    ]
-  },
-  {
-    title: '3. Evidence collection and analysis pipeline',
-    summary: 'The pipeline creates a traceable chain from brand topics to query evidence, crawl evidence, and recommendations.',
-    items: [
-      ['Query Portfolio Builder', 'Queries can be supplied manually, uploaded as custom JSON, reused from a stored portfolio, or generated synthetically through the Bodhi Brand Topic Query Portfolio Builder workflow. The portfolio defines the audit scope with brand topics, journey stages, and query types (branded/non-branded).'],
-      ['Owned URL Mapping', 'The Evidence Service reads sitemap inventory and maps the most relevant owned URLs to each query using a multi-signal ranking: query term overlap, page content relevance, intent matching, related-query linkage, and GEO readiness. Mapping affects CMS/PR prioritisation but does not change page-level GEO scores.'],
-      ['AI Citation Evidence (SerpAPI)', 'Google AI Mode evidence is collected via SerpAPI to capture real AI answer citations. Can be freshly collected or reused from a previous evidence run. Reuse mode allows CMS and crawl testing without spending new SerpAPI calls.'],
-      ['Owned Page Crawling', 'Owned pages from sitemap inventory are crawled to extract: title, canonical URL, meta description, schema types, JSON-LD blocks, extracted markdown text, word count, headings, and technical signals. This crawl evidence feeds into GEO scoring.'],
-      ['External Citation Crawling', 'Top external citation URLs are crawled to understand winning patterns: what content structure, evidence types, and answer formats are being preferred by AI systems.'],
-      ['Bodhi Auditor Workflow', 'The Auditor consumes the compact evidence bundle and produces: executive insights, query diagnostics, page-level CMS recommendations, grouped PR opportunities, action checklist, and the complete frontend report bundle.'],
-      ['Source Classification', 'Each citation URL is classified into source types: owned_brand_ecosystem, competitor_owned, publisher_review, authority_body, partner_infrastructure, forum_social_video, aggregator_marketplace, finance_or_insurance, or other. Classification uses domain pattern matching and brand term detection.'],
-    ]
-  },
-  {
-    title: '4. AI discoverability hygiene',
-    summary: 'Site-level and page-level controls that help crawlers and AI retrieval systems understand, access, and trust the site.',
-    items: [
-      ['Robots.txt', 'Indicates whether the site exposes crawler guidance and sitemap references. Missing robots.txt is a high-priority technical hygiene gap.'],
-      ['LLMs.txt', 'An emerging guidance convention for AI crawlers and agentic retrieval. Useful as a curated route to important brand, product, and policy pages.'],
-      ['JSON-LD/Schema Coverage', 'Percentage of audited owned pages containing structured-data signals. Low coverage creates a structured-data remediation action.'],
-      ['Technical Signals', 'Per-page signals shown in the Owned URLs table: schema types detected, canonical URL, meta description presence, crawl status, and word count.'],
-    ]
-  },
-  {
-    title: '5. Multi-brand and multi-market support',
-    summary: 'The platform supports any brand, any market, and any industry vertical.',
-    items: [
-      ['Brand Configuration', 'Save and load brand configurations with owned domains, brand terms, default parameters. Configurations persist across sessions and can be shared across team members.'],
-      ['Owned Domain Classification', 'Owned domains are specified per brand configuration. URLs matching owned domains are classified as owned_brand_ecosystem. Brand terms are used for stop-word filtering and branded/non-branded query classification.'],
-      ['Custom Portfolio Upload', 'Upload custom query portfolios in JSON format when you want to bypass the synthetic portfolio builder. Useful for brand teams with specific audit requirements.'],
-      ['Industry Agnostic', 'Query portfolio generation, source classification, and GEO scoring are parameterised. The platform works for automotive, technology, retail, healthcare, finance, or any other industry vertical.'],
-    ]
-  },
-  {
-    title: '6. Recommendation logic and governance',
-    summary: 'Recommendations are implementation briefs that must be validated before publication.',
-    items: [
-      ['CMS Recommendations', 'Generated when owned pages need answer blocks, comparison modules, FAQs, proof points, or better page structure. Aggregated by page (not per query) to minimise implementation effort while maximising query coverage.'],
-      ['PR Recommendations', 'Generated when external publishers, authorities, partners, or communities are shaping AI answers. Grouped by source pattern and query cluster, not by owned URL.'],
-      ['Advanced GEO Assets', 'When available, CMS recommendations include: direct answer (40 words), HTML component, JSON-LD extension script, verified facts with source traceability, and validation flags.'],
-      ['Fact Traceability', 'Every numeric, technical, or specification claim in advanced assets must be traceable to: owned page visible crawl text, existing JSON-LD, crawl metadata, or approved input facts. No inferred values or model memory.'],
-      ['Confidence and Freshness', 'AI answers are dynamic. A single run is an evidence sample. Use repeat runs with the same query portfolio to assess movement over time.'],
-      ['Governance', 'Product, Legal, SEO, Content, and Brand teams should validate all claims, regulated language, specifications, and external-source dependencies before implementation.'],
-    ]
-  },
-  {
-    title: '7. Integration architecture',
-    summary: 'The platform integrates multiple services for evidence collection and analysis.',
-    items: [
-      ['Frontend (React/TypeScript)', 'Dashboard deployed on Railway. Renders the report bundle, provides refresh controls, brand configuration management, and PDF export.'],
-      ['Evidence Service (FastAPI)', 'Deployed on Railway with persistent volume. Manages runs, status, portfolios, compact evidence, and final frontend bundles. Orchestrates refresh pipeline.'],
-      ['Bodhi Studio Workflows', 'Two workflows: Brand Topic Query Portfolio Builder (generates synthetic query portfolios) and AI Audit Workflow (builds the canonical frontend report bundle from evidence).'],
-      ['SerpAPI Integration', 'Google AI Mode evidence collection. Captures AI answer text and citation reference links for each audited query.'],
-      ['Report Storage', 'Evidence runs are stored on Railway persistent volume. Latest successful report is always available. Previous runs can be loaded, compared, or deleted.'],
-    ]
-  }
+/* ── Tab definitions ─────────────────────────────────────────── */
+type DocTab = 'overview' | 'platform' | 'sections' | 'metrics' | 'workflow' | 'glossary' | 'faq' | 'limitations';
+
+const tabs: { key: DocTab; label: string; icon: typeof BookOpen }[] = [
+  { key: 'overview', label: 'Overview', icon: BookOpen },
+  { key: 'platform', label: 'How It Works', icon: Cpu },
+  { key: 'sections', label: 'Product Areas', icon: Layers },
+  { key: 'metrics', label: 'Metrics', icon: BarChart3 },
+  { key: 'workflow', label: 'Workflow', icon: Compass },
+  { key: 'glossary', label: 'Glossary', icon: BookText },
+  { key: 'faq', label: 'FAQ', icon: HelpCircle },
+  { key: 'limitations', label: 'Limitations', icon: AlertTriangle },
 ];
 
-export function MethodologyAppendix() {
+/* ── Reusable doc components ─────────────────────────────────── */
+function DocCard({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
+      {title && <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">{title}</p>}
+      <div className="text-sm leading-7 text-[var(--text-secondary)]">{children}</div>
+    </div>
+  );
+}
+
+function DocParagraph({ children }: { children: React.ReactNode }) {
+  return <p className="text-sm leading-7 text-[var(--text-secondary)] mb-4">{children}</p>;
+}
+
+function DocHeading({ children }: { children: React.ReactNode }) {
+  return <h3 className="text-base font-semibold text-[var(--text-primary)] mt-6 mb-3">{children}</h3>;
+}
+
+function DocSubheading({ children }: { children: React.ReactNode }) {
+  return <h4 className="text-sm font-semibold text-[var(--accent-blue)] mt-5 mb-2">{children}</h4>;
+}
+
+function StepItem({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-4 mb-4">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent-blue-soft)] border border-[var(--accent-blue)] flex items-center justify-center text-sm font-bold text-[var(--accent-blue)]">
+        {number}
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">{title}</p>
+        <p className="text-sm leading-6 text-[var(--text-secondary)]">{children}</p>
+      </div>
+    </div>
+  );
+}
+
+function GlossaryItem({ term, children }: { term: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
+      <p className="text-sm font-semibold text-[var(--accent-blue)] mb-1">{term}</p>
+      <p className="text-sm leading-6 text-[var(--text-secondary)]">{children}</p>
+    </div>
+  );
+}
+
+function FaqItem({ question, children }: { question: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
+      <p className="text-sm font-semibold text-[var(--text-primary)] mb-2">{question}</p>
+      <p className="text-sm leading-6 text-[var(--text-secondary)]">{children}</p>
+    </div>
+  );
+}
+
+/* ── Section: Overview ───────────────────────────────────────── */
+function OverviewSection() {
+  return (
+    <WorkspacePanel>
+      <SectionHeader eyebrow="Documentation" title="Overview">
+        What AI Brand Visibility Intelligence does and why it matters.
+      </SectionHeader>
+
+      <DocParagraph>
+        AI Brand Visibility Intelligence helps marketing, content, product, and PR teams understand how their brand appears in AI-generated answers.
+      </DocParagraph>
+
+      <DocParagraph>
+        The platform audits buyer-intent queries across the customer journey, identifies whether the brand is visible, cited, ignored, or displaced by competitors, and recommends practical actions to improve AI visibility. It combines query-level AI answer analysis, source citation patterns, owned-page GEO readiness, content alignment recommendations, and PR proof opportunities into one workflow.
+      </DocParagraph>
+
+      <DocParagraph>
+        The goal is not only to monitor AI visibility, but to explain why visibility is weak and what teams should do next.
+      </DocParagraph>
+
+      <div className="mt-4 rounded-[var(--radius-sm)] border border-amber-500/20 bg-amber-500/10 p-4">
+        <p className="text-sm font-semibold text-amber-300 mb-1">Advisory disclaimer</p>
+        <p className="text-sm leading-6 text-amber-200/80">
+          All recommendations generated by this platform are advisory. They require review and approval by brand, legal, product, and content teams before publication. The platform does not publish or modify any live content.
+        </p>
+      </div>
+    </WorkspacePanel>
+  );
+}
+
+/* ── Section: How The Platform Works ─────────────────────────── */
+function PlatformSection() {
+  return (
+    <WorkspacePanel>
+      <SectionHeader eyebrow="Documentation" title="How The Platform Works">
+        The platform works in four steps to audit, analyse, and recommend.
+      </SectionHeader>
+
+      <div className="space-y-2">
+        <StepItem number={1} title="Build or reuse a query portfolio">
+          The system starts with buyer-intent queries grouped by journey category, such as early research, shortlisting, product evaluation, ownership cost, and purchase decisions.
+        </StepItem>
+
+        <StepItem number={2} title="Collect AI answer and citation evidence">
+          For each query, the system evaluates whether the brand is mentioned, whether owned pages are cited, which competitors appear, and which external domains influence the answer.
+        </StepItem>
+
+        <StepItem number={3} title="Audit owned-page readiness">
+          Mapped owned URLs are scored for GEO readiness, including answer clarity, structured content, schema coverage, factual extractability, and crawlability.
+        </StepItem>
+
+        <StepItem number={4} title="Generate recommendations">
+          The platform converts evidence gaps into content actions, PR opportunities, and implementation tasks that can improve future AI answer visibility.
+        </StepItem>
+      </div>
+    </WorkspacePanel>
+  );
+}
+
+/* ── Section: Dashboard Sections ─────────────────────────────── */
+function DashboardSectionsSection() {
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 lg:grid-cols-2">
-        {sections.map((section) => (
-          <WorkspacePanel key={section.title}>
-            <SectionHeader title={section.title}>{section.summary}</SectionHeader>
-            <div className="mt-3 space-y-3">
-              {section.items.map(([itemLabel, text]) => (
-                <div key={itemLabel} className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3">
-                  <p className="text-sm font-semibold text-[var(--text-primary)]">{itemLabel}</p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{text}</p>
-                </div>
-              ))}
+      <WorkspacePanel>
+        <SectionHeader eyebrow="Documentation" title="Dashboard Sections">
+          Each section of the dashboard serves a specific purpose in the AI visibility audit workflow.
+        </SectionHeader>
+
+        <div className="space-y-4">
+          <DocCard title="Executive Report">
+            <p>The Executive Report gives a leadership-ready summary of AI visibility performance. It highlights the overall AI visibility score, the number of audited queries, average owned-page GEO readiness, competitor pressure, and priority areas for improvement.</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Use this section to understand whether the brand is visible, underrepresented, competitor-led, or dependent on external proof.</p>
+          </DocCard>
+
+          <DocCard title="Query Workbench">
+            <p>The Query Workbench shows performance at the individual query level. Each card explains the buyer question, the journey category, visibility score, leading citation sources, competitor presence, mapped owned URLs, and winning external patterns.</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Use this section to understand which queries are being won, lost, or influenced by competitors and third-party publishers.</p>
+          </DocCard>
+
+          <DocCard title="Source Landscape">
+            <p>Source Landscape shows which source types and citation domains influence AI answers across the audited query set. It helps identify whether AI systems are relying on owned pages, competitors, forums, publishers, videos, social content, or external authority sources.</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Use this section to identify where citation authority is coming from and where PR or publisher outreach may be needed.</p>
+          </DocCard>
+
+          <DocCard title="Owned URLs Readiness">
+            <p>Owned URLs Readiness evaluates whether brand-owned pages are structured in a way that AI systems can parse, extract, and cite. Each page receives a GEO readiness score based on content clarity, answer-first structure, schema coverage, factual evidence, and technical discoverability.</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Use this section to decide which owned pages need content, schema, or technical improvements.</p>
+          </DocCard>
+
+          <DocCard title="Content Alignment">
+            <p>Content Alignment converts query and page evidence into CMS-ready recommendations. Each recommendation identifies the target page, linked queries, recommended content module, direct answer copy, missing facts, JSON-LD suggestions, and FAQ opportunities.</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Use this section to brief content, product, legal, and CMS teams on what needs to be added or improved on owned pages.</p>
+          </DocCard>
+
+          <DocCard title="PR & Brand Suggestions">
+            <p>PR & Brand Suggestions identifies external proof gaps. These are cases where AI answers rely on third-party sources, competitor content, or publisher references because the brand lacks sufficiently citeable external evidence.</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Use this section to brief PR and communications teams on what proof assets, publisher pitches, research reports, expert commentary, or third-party validation would help shift future AI citations toward the brand.</p>
+          </DocCard>
+
+          <DocCard title="Action Checklist">
+            <p>The Action Checklist consolidates recommended work across content, technical SEO, product, and PR workstreams. It helps teams prioritise, assign, and track implementation.</p>
+            <p className="mt-2 text-xs text-[var(--text-muted)]">Use this section as the operational bridge between audit insight and execution.</p>
+          </DocCard>
+        </div>
+      </WorkspacePanel>
+    </div>
+  );
+}
+
+/* ── Section: Metrics And Scoring ────────────────────────────── */
+function MetricsSection() {
+  return (
+    <div className="space-y-5">
+      <WorkspacePanel>
+        <SectionHeader eyebrow="Documentation" title="Metrics And Scoring">
+          How the platform measures AI visibility, page readiness, sentiment, and citation quality.
+        </SectionHeader>
+
+        <div className="space-y-4">
+          <DocCard title="AI Visibility Score (0\u2013100)">
+            <p>AI Visibility Score is a 0\u2013100 measure of how visible the brand is across the audited AI answer set. It considers whether the brand appears, whether owned pages are cited, how strongly competitors appear, and whether the answer is brand-led, competitor-led, external-led, or absent.</p>
+            <p className="mt-2">A higher score means the brand is more consistently present and better supported in AI-generated answers.</p>
+            <div className="mt-3 rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-xs text-[var(--text-muted)]">
+              <p className="font-semibold text-[var(--text-secondary)] mb-1">Scoring components</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li>Owned target-page citation: +55 points</li>
+                <li>Owned domain citation: +30 points</li>
+                <li>Absence of competitors: +15 points</li>
+                <li>External citation evidence: up to +20 points</li>
+                <li>Competitor presence penalty: \u221215 points</li>
+                <li>External dependency penalty: \u22128 points</li>
+              </ul>
             </div>
-          </WorkspacePanel>
+          </DocCard>
+
+          <DocCard title="GEO Readiness Score (0\u2013120)">
+            <p>GEO Readiness Score evaluates whether an owned page is structured for generative engines to understand and cite. It measures factors such as answer-first copy, page structure, schema and JSON-LD coverage, factual extractability, content depth, and technical discoverability.</p>
+            <p className="mt-2">A high GEO score does not guarantee citation, but it increases the likelihood that AI systems can use the page as a reliable source.</p>
+            <div className="mt-3 rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 text-xs text-[var(--text-muted)]">
+              <p className="font-semibold text-[var(--text-secondary)] mb-1">Six dimensions (each 0\u201320)</p>
+              <ul className="list-disc pl-4 space-y-1">
+                <li><span className="text-[var(--text-secondary)]">Content Clarity</span> \u2014 direct, extractable sections with clear headings and answer blocks</li>
+                <li><span className="text-[var(--text-secondary)]">Semantic Depth</span> \u2014 coverage of subtopics, comparisons, constraints, and trade-offs</li>
+                <li><span className="text-[var(--text-secondary)]">Structured Data</span> \u2014 JSON-LD and schema.org markup presence and diversity</li>
+                <li><span className="text-[var(--text-secondary)]">E-E-A-T Signals</span> \u2014 proof points, specifications, warranties, source-backed claims</li>
+                <li><span className="text-[var(--text-secondary)]">Freshness Index</span> \u2014 recency cues, update dates, current policy references</li>
+                <li><span className="text-[var(--text-secondary)]">FAQ Readiness</span> \u2014 extractable question-answer blocks and structured Q&A patterns</li>
+              </ul>
+            </div>
+          </DocCard>
+
+          <DocCard title="Sentiment">
+            <p>Sentiment measures the tone of AI answers when the brand is mentioned. A brand can be visible but still framed negatively or neutrally. Sentiment helps teams understand whether AI systems describe the brand in a favourable, neutral, mixed, or negative way.</p>
+            <p className="mt-2">If the brand is not mentioned in an answer, sentiment should be marked as not applicable.</p>
+          </DocCard>
+
+          <DocCard title="Citation Quality">
+            <p>Citation quality evaluates the strength of sources influencing AI answers. Owned citations are valuable when they support accurate brand narratives. External citations are valuable when they validate the brand through trusted third-party proof. Competitor citations indicate displacement risk.</p>
+          </DocCard>
+
+          <DocCard title="Share Of Voice">
+            <p>Share of voice compares how often the brand appears against competitors across the audited query set. It helps identify whether the brand is leading, contested, or underrepresented in AI answer narratives.</p>
+          </DocCard>
+        </div>
+      </WorkspacePanel>
+    </div>
+  );
+}
+
+/* ── Section: How To Use The Product ─────────────────────────── */
+function WorkflowSection() {
+  return (
+    <WorkspacePanel>
+      <SectionHeader eyebrow="Documentation" title="How To Use The Product">
+        Recommended workflow for getting the most value from each audit run.
+      </SectionHeader>
+
+      <div className="space-y-2">
+        <StepItem number={1} title="Start with the Executive Report">
+          Understand overall visibility and priority gaps. Review the brand topic scorecard to see which journey categories need attention.
+        </StepItem>
+
+        <StepItem number={2} title="Use Query Workbench to inspect weak queries">
+          Drill into the specific buyer questions where the brand is weak. Check visibility status, competitor presence, and citation sources for each query.
+        </StepItem>
+
+        <StepItem number={3} title="Review Source Landscape">
+          Understand which domains and source types AI systems rely on. Identify whether owned pages, competitors, or third-party publishers dominate the citation layer.
+        </StepItem>
+
+        <StepItem number={4} title="Use Owned URLs Readiness for GEO improvements">
+          Identify which brand pages need content, schema, or technical improvements. Compare GEO dimension scores across brand topics using the radar chart.
+        </StepItem>
+
+        <StepItem number={5} title="Use Content Alignment to brief CMS and product teams">
+          Review page-level content recommendations including direct answers, FAQ suggestions, JSON-LD tags, and missing facts. All recommendations require brand, legal, and product validation.
+        </StepItem>
+
+        <StepItem number={6} title="Use PR & Brand Suggestions for external proof gaps">
+          Brief communications teams on what proof assets, publisher pitches, and third-party validation would help shift future AI citations toward the brand.
+        </StepItem>
+
+        <StepItem number={7} title="Track execution in the Action Checklist">
+          Use the consolidated action list to assign, prioritise, and track implementation across CMS and PR workstreams.
+        </StepItem>
+
+        <StepItem number={8} title="Re-run the audit after changes are published">
+          Measure improvement by running the same query portfolio after content updates, PR campaigns, or product launches. Compare scores across runs to track progress.
+        </StepItem>
+      </div>
+    </WorkspacePanel>
+  );
+}
+
+/* ── Section: Glossary ───────────────────────────────────────── */
+function GlossarySection() {
+  return (
+    <WorkspacePanel>
+      <SectionHeader eyebrow="Documentation" title="Glossary">
+        Key terms and concepts used throughout the platform.
+      </SectionHeader>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <GlossaryItem term="AEO (Answer Engine Optimization)">
+          The practice of improving how brand content appears in AI-generated answers.
+        </GlossaryItem>
+
+        <GlossaryItem term="GEO (Generative Engine Optimization)">
+          The practice of structuring content so generative AI systems can parse, trust, and cite it.
+        </GlossaryItem>
+
+        <GlossaryItem term="AI Visibility">
+          The degree to which a brand appears in AI-generated answers for relevant buyer queries.
+        </GlossaryItem>
+
+        <GlossaryItem term="Citation">
+          A source or URL used by an AI answer to support its response.
+        </GlossaryItem>
+
+        <GlossaryItem term="Owned URL">
+          A page controlled by the brand, such as a product page, FAQ, guide, or support page.
+        </GlossaryItem>
+
+        <GlossaryItem term="External Source">
+          A third-party source cited by AI systems, such as publishers, forums, review sites, social platforms, or partner pages.
+        </GlossaryItem>
+
+        <GlossaryItem term="Competitor-Led Query">
+          A query where competitors are more visible or more strongly cited than the audited brand.
+        </GlossaryItem>
+
+        <GlossaryItem term="External-Led Query">
+          A query where AI answers rely mainly on third-party sources rather than owned brand pages.
+        </GlossaryItem>
+
+        <GlossaryItem term="GEO Readiness">
+          A measure of how well an owned page is structured for AI systems to understand and cite.
+        </GlossaryItem>
+
+        <GlossaryItem term="Direct Answer">
+          A concise answer to a buyer query that can be extracted by AI systems.
+        </GlossaryItem>
+
+        <GlossaryItem term="JSON-LD">
+          Structured data markup that helps machines understand page entities, topics, FAQs, products, and relationships.
+        </GlossaryItem>
+      </div>
+    </WorkspacePanel>
+  );
+}
+
+/* ── Section: FAQs ───────────────────────────────────────────── */
+function FaqSection() {
+  return (
+    <WorkspacePanel>
+      <SectionHeader eyebrow="Documentation" title="Frequently Asked Questions">
+        Common questions about AI visibility, GEO, and the platform.
+      </SectionHeader>
+
+      <div className="space-y-3">
+        <FaqItem question="What is the difference between SEO and GEO?">
+          SEO focuses on ranking in traditional search results. GEO focuses on making content understandable, trustworthy, and citeable by generative AI systems.
+        </FaqItem>
+
+        <FaqItem question="Why can a brand rank well in Google but still have weak AI visibility?">
+          AI systems may prefer sources that provide clearer answers, stronger structured data, third-party validation, or more directly extractable evidence. Ranking alone does not guarantee inclusion in AI-generated answers.
+        </FaqItem>
+
+        <FaqItem question="Why do external sources matter?">
+          AI systems often rely on third-party publishers, forums, reviews, and authority sites to validate claims. If the brand lacks external proof, AI answers may cite competitors or neutral publishers instead.
+        </FaqItem>
+
+        <FaqItem question="Why are some recommendations marked as requiring validation?">
+          The platform avoids inventing product claims. Any recommendation involving price, range, warranty, incentives, safety, reliability, or performance should be reviewed by the brand, legal, and product teams before publication.
+        </FaqItem>
+
+        <FaqItem question="How often should an audit be rerun?">
+          Rerun after major content updates, PR campaigns, product launches, or changes in AI answer behavior. For active optimization programmes, monthly or campaign-based reruns are recommended.
+        </FaqItem>
+      </div>
+    </WorkspacePanel>
+  );
+}
+
+/* ── Section: Limitations And Review Requirements ────────────── */
+function LimitationsSection() {
+  return (
+    <WorkspacePanel>
+      <SectionHeader eyebrow="Documentation" title="Limitations And Review Requirements">
+        Important context for interpreting results and acting on recommendations.
+      </SectionHeader>
+
+      <div className="space-y-4">
+        <DocCard title="Evidence is a sample, not a census">
+          <p>AI answers are dynamic and vary by query phrasing, user context, and model version. Each audit run captures a point-in-time evidence sample. Use repeat runs with the same query portfolio to assess trends over time.</p>
+        </DocCard>
+
+        <DocCard title="Recommendations are advisory">
+          <p>All content alignment, JSON-LD, FAQ, and PR recommendations are advisory. They require review and approval by brand, legal, product, and content teams before publication. The platform does not publish or modify any live content.</p>
+        </DocCard>
+
+        <DocCard title="GEO scores are page-intrinsic">
+          <p>GEO Readiness Scores measure page structure and content quality independently of query mapping. A high GEO score increases the likelihood of citation but does not guarantee it. Query-level AI visibility depends on additional factors including competitor strength, external proof, and AI model preferences.</p>
+        </DocCard>
+
+        <DocCard title="Fact traceability">
+          <p>Every numeric, technical, or specification claim in CMS recommendations must be traceable to owned page crawl text, existing JSON-LD, crawl metadata, or approved input facts. The platform does not infer values or use model memory. Missing facts are flagged explicitly and should be treated as action items for the product or content team.</p>
+        </DocCard>
+
+        <DocCard title="Sentiment limitations">
+          <p>Sentiment analysis is applied only when the brand is mentioned in an AI answer. If the brand is not mentioned, sentiment is marked as not applicable. Sentiment should not be inferred from competitor mentions or neutral publisher content.</p>
+        </DocCard>
+
+        <DocCard title="Multi-brand and multi-market">
+          <p>The platform supports any brand, market, and industry vertical. Owned domain classification, brand term detection, and query portfolio generation are fully parameterised. However, source type classification patterns (competitor detection, publisher identification) may need calibration for new industry verticals.</p>
+        </DocCard>
+
+        <DocCard title="Governance checklist">
+          <p>Before implementing any recommendation, ensure the following teams have reviewed and approved:</p>
+          <ul className="mt-2 list-disc pl-4 space-y-1">
+            <li>Product team \u2014 for specification accuracy and feature claims</li>
+            <li>Legal/Compliance \u2014 for regulated language, pricing, warranty, and safety claims</li>
+            <li>Brand team \u2014 for tone, positioning, and competitive references</li>
+            <li>Content/CMS team \u2014 for implementation feasibility and page structure</li>
+            <li>SEO/GEO lead \u2014 for technical implementation and schema accuracy</li>
+          </ul>
+        </DocCard>
+      </div>
+    </WorkspacePanel>
+  );
+}
+
+/* ── Main Documentation Component ────────────────────────────── */
+export function MethodologyAppendix() {
+  const [activeTab, setActiveTab] = useState<DocTab>('overview');
+
+  return (
+    <div className="space-y-5">
+      {/* Tab navigation */}
+      <div className="flex flex-wrap gap-2">
+        {tabs.map(({ key, label, icon: Icon }) => (
+          <DarkButton
+            key={key}
+            variant={activeTab === key ? 'primary' : 'default'}
+            onClick={() => setActiveTab(key)}
+          >
+            <Icon size={14} /> {label}
+          </DarkButton>
         ))}
       </div>
+
+      {/* Tab content */}
+      {activeTab === 'overview' && <OverviewSection />}
+      {activeTab === 'platform' && <PlatformSection />}
+      {activeTab === 'sections' && <DashboardSectionsSection />}
+      {activeTab === 'metrics' && <MetricsSection />}
+      {activeTab === 'workflow' && <WorkflowSection />}
+      {activeTab === 'glossary' && <GlossarySection />}
+      {activeTab === 'faq' && <FaqSection />}
+      {activeTab === 'limitations' && <LimitationsSection />}
     </div>
   );
 }
