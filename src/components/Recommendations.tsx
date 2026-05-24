@@ -1,6 +1,7 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import type { ActionItem, RecommendationModule, ReportBundle, CmsCopyModule, AdvancedGeoAsset, AdvancedPrAssetPack } from '../types/report';
 import { Badge, WorkspacePanel, SectionHeader, DarkButton, StatusPill } from './ui';
+import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 
 // Backward-compatible aliases
 const Card = WorkspacePanel;
@@ -184,22 +185,30 @@ function CmsCardBody({ item }: { item: RecommendationModule }) {
       {activeTab === 'jsonld' && (
         <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3 space-y-3">
           <p className="typo-meta text-[var(--text-muted)]">JSON-LD Suggestions</p>
-          {/* Show LLM-generated JSON-LD tags first (from merged CMS output) */}
+          {/* Show LLM-generated JSON-LD tags as beautified, collapsible JSON with copy */}
           {item.jsonLdTags && item.jsonLdTags.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-xs font-semibold text-[var(--accent-purple)]">Intent-aware JSON-LD recommendations</p>
-              {item.jsonLdTags.map((tag, i) => (
-                <div key={i} className="rounded-[var(--radius-sm)] border border-[var(--accent-purple)]/20 bg-[var(--accent-purple)]/5 p-2 text-xs text-[var(--text-secondary)] font-mono break-all">
-                  {typeof tag === 'string' ? tag : JSON.stringify(tag, null, 2)}
-                </div>
-              ))}
+              {item.jsonLdTags.map((tag, i) => {
+                const jsonObj = typeof tag === 'string' ? tryParseJson(tag) : tag;
+                return (
+                  <div key={i} className="rounded-[var(--radius-sm)] border border-[var(--accent-purple)]/20 bg-[var(--bg-app)] overflow-hidden">
+                    <JsonLdViewer data={jsonObj} label={`JSON-LD ${i + 1}`} />
+                  </div>
+                );
+              })}
             </div>
           )}
-          {/* Show advanced asset JSON-LD if available */}
+          {/* Show advanced asset JSON-LD if available — strategy info only, hide old yellow pre block */}
           {asset && (
             <>
               <p className="text-xs text-[var(--text-muted)]">Strategy: <span className="font-semibold text-[var(--text-secondary)]">{asset.json_ld_strategy}</span>{asset.target_anchor_id && <> · Anchor: <code className="text-xs text-[var(--accent-purple)]">{asset.target_anchor_id}</code></>}</p>
-              {asset.json_ld_script && <pre className="overflow-x-auto rounded-[var(--radius-sm)] bg-[var(--bg-app)] border border-[var(--border-subtle)] p-3 text-xs text-amber-300">{asset.json_ld_script}</pre>}
+              {/* Render asset json_ld_script as beautified collapsible JSON instead of old yellow pre */}
+              {asset.json_ld_script && (
+                <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-app)] overflow-hidden">
+                  <JsonLdViewer data={tryParseJson(asset.json_ld_script)} label="Advanced GEO JSON-LD" />
+                </div>
+              )}
               {asset.json_ld_merge_notes.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">{asset.json_ld_merge_notes.map((note, i) => <li key={i}>• {note}</li>)}</ul>
               )}
@@ -543,4 +552,138 @@ function ActionRow({ item }: { item: ActionItem }) {
 
 function Meta({ label, value }: { label: string; value: string }) {
   return <div className="rounded-[var(--radius-sm)] bg-[var(--bg-panel)] p-3"><p className="typo-meta text-[var(--text-muted)]">{label}</p><p className="mt-1 font-semibold text-[var(--text-primary)]">{value}</p></div>;
+}
+
+/* ── JSON-LD Beautified Viewer with Collapse/Expand and Copy ──────────── */
+
+function tryParseJson(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try { return JSON.parse(trimmed); } catch { return value; }
+    }
+    return value;
+  }
+  return value;
+}
+
+function JsonLdViewer({ data, label: viewerLabel }: { data: unknown; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const jsonString = typeof data === 'object' && data !== null
+    ? JSON.stringify(data, null, 2)
+    : String(data);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(jsonString);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = jsonString;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [jsonString]);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]">
+        <span className="text-xs font-semibold text-[var(--accent-purple)]">{viewerLabel}</span>
+        <button
+          onClick={() => void handleCopy()}
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
+          title="Copy complete JSON-LD object"
+        >
+          {copied ? <><Check size={12} className="text-[var(--accent-success)]" /> Copied!</> : <><Copy size={12} /> Copy JSON-LD</>}
+        </button>
+      </div>
+      <div className="p-3 font-mono text-xs leading-5 overflow-x-auto max-h-[600px] overflow-y-auto">
+        {typeof data === 'object' && data !== null
+          ? <CollapsibleJsonNode value={data} depth={0} />
+          : <span className="text-[var(--text-secondary)]">{String(data)}</span>
+        }
+      </div>
+    </div>
+  );
+}
+
+function CollapsibleJsonNode({ value, depth, keyName }: { value: unknown; depth: number; keyName?: string }) {
+  const [collapsed, setCollapsed] = useState(depth > 1);
+  const indent = depth * 16;
+
+  if (value === null) return <JsonLine indent={indent} keyName={keyName}><span className="text-[var(--text-muted)]">null</span></JsonLine>;
+  if (typeof value === 'boolean') return <JsonLine indent={indent} keyName={keyName}><span className="text-[var(--accent-purple)]">{String(value)}</span></JsonLine>;
+  if (typeof value === 'number') return <JsonLine indent={indent} keyName={keyName}><span className="text-[var(--accent-blue)]">{String(value)}</span></JsonLine>;
+  if (typeof value === 'string') return <JsonLine indent={indent} keyName={keyName}><span className="text-[var(--accent-success)]">"{value}"</span></JsonLine>;
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <JsonLine indent={indent} keyName={keyName}><span className="text-[var(--text-muted)]">[]</span></JsonLine>;
+    return (
+      <div>
+        <div style={{ paddingLeft: indent }} className="flex items-center gap-1 cursor-pointer select-none hover:bg-[var(--bg-card-hover)] rounded-sm py-0.5" onClick={() => setCollapsed(!collapsed)}>
+          {collapsed ? <ChevronRight size={12} className="text-[var(--text-muted)] flex-shrink-0" /> : <ChevronDown size={12} className="text-[var(--text-muted)] flex-shrink-0" />}
+          {keyName && <><span className="text-[var(--accent-blue)]">"{keyName}"</span><span className="text-[var(--text-muted)]">: </span></>}
+          <span className="text-[var(--text-muted)]">[</span>
+          {collapsed && <span className="text-[var(--text-muted)] ml-1">{value.length} item{value.length !== 1 ? 's' : ''}</span>}
+          {collapsed && <span className="text-[var(--text-muted)] ml-1">]</span>}
+        </div>
+        {!collapsed && (
+          <>
+            {value.map((item, i) => (
+              <div key={i}>
+                <CollapsibleJsonNode value={item} depth={depth + 1} />
+                {i < value.length - 1 && <span style={{ paddingLeft: (depth + 1) * 16 }} className="text-[var(--text-muted)] block">,</span>}
+              </div>
+            ))}
+            <div style={{ paddingLeft: indent }} className="text-[var(--text-muted)]">]</div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return <JsonLine indent={indent} keyName={keyName}><span className="text-[var(--text-muted)]">{'{}'}</span></JsonLine>;
+    return (
+      <div>
+        <div style={{ paddingLeft: indent }} className="flex items-center gap-1 cursor-pointer select-none hover:bg-[var(--bg-card-hover)] rounded-sm py-0.5" onClick={() => setCollapsed(!collapsed)}>
+          {collapsed ? <ChevronRight size={12} className="text-[var(--text-muted)] flex-shrink-0" /> : <ChevronDown size={12} className="text-[var(--text-muted)] flex-shrink-0" />}
+          {keyName && <><span className="text-[var(--accent-blue)]">"{keyName}"</span><span className="text-[var(--text-muted)]">: </span></>}
+          <span className="text-[var(--text-muted)]">{'{'}</span>
+          {collapsed && <span className="text-[var(--text-muted)] ml-1">{entries.length} key{entries.length !== 1 ? 's' : ''}</span>}
+          {collapsed && <span className="text-[var(--text-muted)] ml-1">{'}'}</span>}
+        </div>
+        {!collapsed && (
+          <>
+            {entries.map(([k, v], i) => (
+              <div key={k}>
+                <CollapsibleJsonNode value={v} depth={depth + 1} keyName={k} />
+                {i < entries.length - 1 && <span style={{ paddingLeft: (depth + 1) * 16 }} className="text-[var(--text-muted)] block">,</span>}
+              </div>
+            ))}
+            <div style={{ paddingLeft: indent }} className="text-[var(--text-muted)]">{'}'}</div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return <JsonLine indent={indent} keyName={keyName}><span className="text-[var(--text-secondary)]">{String(value)}</span></JsonLine>;
+}
+
+function JsonLine({ indent, keyName, children }: { indent: number; keyName?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ paddingLeft: indent }} className="py-0.5">
+      {keyName && <><span className="text-[var(--accent-blue)]">"{keyName}"</span><span className="text-[var(--text-muted)]">: </span></>}
+      {children}
+    </div>
+  );
 }
