@@ -195,10 +195,22 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
   const isDone = !isFailed && (currentStage === 'report_bundle_ready' || terminalStages.has(currentStage));
   // Determine if the backend is actively processing (not just that we have a status object)
   const isActivelyRunning = Boolean(status?.active) && !isFailed && !isDone;
-  // After page refresh: if backend is idle but has a latestSuccessfulRunId,
-  // show the completed state instead of resetting to 'Ready to Start'.
-  // This ensures the progress bar reflects the last successful run's completion.
-  const hasCompletedLastRun = !isActivelyRunning && !isFailed && !isDone && !refreshResult && Boolean(status?.latestSuccessfulRunId) && !status?.active;
+
+  // Canonical currentRunState: progress bar depends ONLY on this.
+  // - isCurrentSessionRun: user started a run in this browser session (trackedRunId is set)
+  // - isActiveRun: backend reports an active run right now
+  // - isFailedCurrentRun: the run the user started in this session failed
+  // - isDoneCurrentRun: the run the user started in this session completed
+  // Historical latestSuccessfulRunId NEVER affects progress bar state.
+  // It belongs only in the right rail and run history.
+  const isCurrentSessionRun = Boolean(trackedRunId);
+  const isActiveRun = Boolean(status?.active && status?.runId);
+  const isFailedCurrentRun = isCurrentSessionRun && isFailed;
+  const isDoneCurrentRun = isCurrentSessionRun && isDone;
+
+  // If there's no active run AND no current-session failure/completion,
+  // the progress bar shows all stages as pending ("Ready to Start").
+  const isIdle = !isActiveRun && !isFailedCurrentRun && !isDoneCurrentRun;
 
   async function checkStatus() {
     setIsChecking(true); setError('');
@@ -274,14 +286,18 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
         <SectionHeader eyebrow="Workflow Status" title={statusText(status, trackedRunId)} />
         <div className="flex flex-wrap gap-2">
           {workflowStages.map((stage, index) => {
-            // State logic:
-            // 1. Failed: the stage that failed shows red
-            // 2. Done (all complete or isDone): all stages green
-            // 3. Actively running: stages before current = done, current = active, after = pending
-            // 4. hasCompletedLastRun (page refreshed after success): all stages green
-            // 5. Idle (no active run, no status): all pending
+            // Canonical progress state logic:
+            // 1. Idle (no active run, no current-session failure/completion): all pending
+            // 2. Failed current-session run: stages before failed = done, failed stage = red, after = pending
+            // 3. Done current-session run: all stages green
+            // 4. Actively running (backend reports active): stages before current = done, current = active, after = pending
+            // 5. Active run discovered on page refresh: same as #4
+            // Historical latestSuccessfulRunId NEVER lights up the progress bar.
             let state: 'pending' | 'active' | 'done' | 'failed';
-            if (isFailed) {
+            if (isIdle) {
+              // No active run, no current-session run result — all pending
+              state = 'pending';
+            } else if (isFailedCurrentRun) {
               if (currentWfKey === stage.key) {
                 state = 'failed';
               } else if (wfIdx >= 0 && index < wfIdx) {
@@ -289,10 +305,11 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
               } else {
                 state = 'pending';
               }
-            } else if (isDone || hasCompletedLastRun) {
-              // All stages green when run completed (including after page refresh)
+            } else if (isDoneCurrentRun) {
+              // Current session run completed — all stages green
               state = 'done';
-            } else if (isActivelyRunning && wfIdx >= 0) {
+            } else if (isActiveRun && wfIdx >= 0) {
+              // Backend reports an active run (either user-started or discovered on refresh)
               if (index < wfIdx) {
                 state = 'done';
               } else if (currentWfKey === stage.key) {
@@ -306,24 +323,24 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
             return <WorkflowStage key={stage.key} label={stage.label} state={state} />;
           })}
         </div>
-        {isActivelyRunning && (status?.runId || trackedRunId) && (
+        {isActiveRun && (status?.runId || trackedRunId) && (
           <p className="mt-3 text-xs font-mono text-[var(--accent-blue)]">
             Currently running: {status?.runId || trackedRunId}
           </p>
         )}
-        {isFailed && (status?.runId || trackedRunId) && (
+        {isFailedCurrentRun && (status?.runId || trackedRunId) && (
           <p className="mt-3 text-xs font-mono text-[var(--accent-danger)]">
             Failed: {status?.runId || trackedRunId}{status?.errorMessage ? ` — ${status.errorMessage}` : ''}
           </p>
         )}
-        {(isDone || hasCompletedLastRun) && !isFailed && (
+        {isDoneCurrentRun && (
           <p className="mt-3 text-xs font-mono text-[var(--accent-success)]">
-            Completed successfully{status?.latestSuccessfulRunId ? `: ${status.latestSuccessfulRunId}` : status?.runId ? `: ${status.runId}` : ''}
+            Completed successfully{status?.runId ? `: ${status.runId}` : ''}
           </p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <DarkButton onClick={() => void checkStatus()} disabled={isChecking}><RefreshCcw size={13} /> {isChecking ? 'Checking...' : 'Check status'}</DarkButton>
-          {(isDone || hasCompletedLastRun) && !isFailed && status?.latestSuccessfulRunId && (
+          {isDoneCurrentRun && !isFailed && (
             <DarkButton variant="primary" onClick={() => { window.location.reload(); }}>Load the report</DarkButton>
           )}
         </div>

@@ -296,41 +296,40 @@ export default function App() {
         {/* ── Right rail (fixed) ── */}
         <aside className="hidden xl:flex h-full w-64 shrink-0 flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-surface)] no-print overflow-y-auto hide-scrollbar">
           <div className="p-4 space-y-4">
-            {/* Run status */}
+            {/* Run status — canonical: active=running, !active+no error=idle, error=failed */}
             <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3">
               <p className="typo-meta text-[var(--text-muted)] mb-2">Run Status</p>
-              <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'bg-[var(--accent-danger)]' : refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : 'bg-[var(--text-muted)]'}`} />
-                <span className={`text-sm font-semibold ${refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'text-[var(--accent-danger)]' : refreshStatus?.active ? 'text-[var(--accent-blue)]' : 'text-[var(--text-secondary)]'}`}>
-                  {refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'Failed' : refreshStatus?.active ? 'Running' : 'Idle'}
-                </span>
-              </div>
-              {/* Error state: show error message */}
-              {(refreshStatus?.errorMessage || refreshStatus?.status === 'failed') && (
-                <>
-                  <p className="mt-2 text-[11px] text-[var(--accent-danger)]">{refreshStatus?.stage ? niceStage(refreshStatus.stage) : 'Auditor failed'}</p>
-                  {refreshStatus?.errorMessage && (
-                    <p className="mt-1 text-[10px] text-[var(--accent-danger)] break-all">{refreshStatus.errorMessage}</p>
-                  )}
-                  {refreshStatus?.runId && (
-                    <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">Run: {refreshStatus.runId}</p>
-                  )}
-                </>
-              )}
-              {/* Running state */}
-              {refreshStatus?.active && !refreshStatus?.errorMessage && refreshStatus?.status !== 'failed' && refreshStatus?.stage && (
-                <p className="mt-2 text-[11px] text-[var(--accent-blue)]">{niceStage(refreshStatus.stage)}</p>
-              )}
-              {refreshStatus?.active && !refreshStatus?.errorMessage && refreshStatus?.status !== 'failed' && refreshStatus?.runId && (
-                <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">Run: {refreshStatus.runId}</p>
-              )}
-              {/* Idle state: no extra stage info, just show last success if available */}
-              {refreshStatus?.latestSuccessfulRunId && (
-                <div className="mt-2 text-[10px] text-[var(--text-muted)] break-all">
-                  <p>Last success:</p>
-                  <p className="font-mono mt-0.5">{refreshStatus.latestSuccessfulRunId}</p>
-                </div>
-              )}
+              {(() => {
+                // Derive display state from the normalised RunStatusSummary.
+                // Error fields always take precedence over running status.
+                const hasError = Boolean(refreshStatus?.errorMessage) || refreshStatus?.status === 'failed';
+                const isRunning = Boolean(refreshStatus?.active) && !hasError;
+                const displayState = hasError ? 'failed' : isRunning ? 'running' : 'idle';
+                return (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${displayState === 'failed' ? 'bg-[var(--accent-danger)]' : displayState === 'running' ? 'bg-[var(--accent-blue)] animate-pulse' : 'bg-[var(--text-muted)]'}`} />
+                      <span className={`text-sm font-semibold ${displayState === 'failed' ? 'text-[var(--accent-danger)]' : displayState === 'running' ? 'text-[var(--accent-blue)]' : 'text-[var(--text-secondary)]'}`}>
+                        {displayState === 'failed' ? 'Failed' : displayState === 'running' ? 'Running' : 'Idle'}
+                      </span>
+                    </div>
+                    {/* Running: show current stage and run ID */}
+                    {displayState === 'running' && refreshStatus?.stage && (
+                      <p className="mt-2 text-[11px] text-[var(--accent-blue)]">{niceStage(refreshStatus.stage)}</p>
+                    )}
+                    {displayState === 'running' && refreshStatus?.runId && (
+                      <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">Run: {refreshStatus.runId}</p>
+                    )}
+                    {/* Idle: show last success if available */}
+                    {displayState === 'idle' && refreshStatus?.latestSuccessfulRunId && (
+                      <div className="mt-2 text-[10px] text-[var(--text-muted)] break-all">
+                        <p>Last success:</p>
+                        <p className="font-mono mt-0.5">{refreshStatus.latestSuccessfulRunId}</p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* Latest successful run */}
