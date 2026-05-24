@@ -297,8 +297,8 @@ export default function App() {
             <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3">
               <p className="typo-meta text-[var(--text-muted)] mb-2">Run Status</p>
               <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'bg-[var(--accent-danger)]' : refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : 'bg-[var(--accent-success)]'}`} />
-                <span className={`text-sm font-semibold ${refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'text-[var(--accent-danger)]' : refreshStatus?.active ? 'text-[var(--accent-blue)]' : 'text-[var(--accent-success)]'}`}>
+                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'bg-[var(--accent-danger)]' : refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : 'bg-[var(--text-muted)]'}`} />
+                <span className={`text-sm font-semibold ${refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'text-[var(--accent-danger)]' : refreshStatus?.active ? 'text-[var(--accent-blue)]' : 'text-[var(--text-secondary)]'}`}>
                   {refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'Failed' : refreshStatus?.active ? 'Running' : 'Idle'}
                 </span>
               </div>
@@ -321,10 +321,7 @@ export default function App() {
               {refreshStatus?.active && !refreshStatus?.errorMessage && refreshStatus?.status !== 'failed' && refreshStatus?.runId && (
                 <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">Run: {refreshStatus.runId}</p>
               )}
-              {/* Idle state: show last stage if not terminal */}
-              {!refreshStatus?.active && !refreshStatus?.errorMessage && refreshStatus?.status !== 'failed' && refreshStatus?.stage && !['report_bundle_ready', 'completed', 'success'].includes(String(refreshStatus.stage).toLowerCase()) && (
-                <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{niceStage(refreshStatus.stage)}</p>
-              )}
+              {/* Idle state: no extra stage info, just show last success if available */}
               {refreshStatus?.latestSuccessfulRunId && (
                 <div className="mt-2 text-[10px] text-[var(--text-muted)] break-all">
                   <p>Last success:</p>

@@ -71,7 +71,7 @@ function runIdFrom(status: RunStatusSummary | null, fallback = '') { return stat
 function statusText(status: RunStatusSummary | null, trackedRunId: string) {
   const id = runIdFrom(status, trackedRunId);
   if (!status && trackedRunId) return `Tracking: ${trackedRunId}`;
-  if (!status) return 'Status not checked yet.';
+  if (!status) return 'Ready to Start!';
   // Error state takes precedence over everything
   if (status.errorMessage || status.status === 'failed') {
     const errMsg = status.errorMessage || niceStage(status.stage || 'failed');
@@ -79,9 +79,8 @@ function statusText(status: RunStatusSummary | null, trackedRunId: string) {
   }
   // When backend is actively processing, show the current stage and run ID
   if (status.active) return `${niceStage(status.stage || status.status)}${id ? ` \u00b7 ${id}` : ''}`;
-  // When idle (no active run), show waiting message with latest successful run info
-  if (status.latestSuccessfulRunId) return `Waiting to start \u00b7 Last success: ${status.latestSuccessfulRunId}`;
-  return 'Waiting to start \u00b7 No previous successful runs.';
+  // When idle (no active run), show ready to start
+  return 'Ready to Start!';
 }
 
 function valueFromRaw(raw: unknown, keys: string[]): string {
@@ -314,11 +313,16 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
             Failed: {status?.runId || trackedRunId}{status?.errorMessage ? ` — ${status.errorMessage}` : ''}
           </p>
         )}
-        {!isActivelyRunning && !isFailed && !isDone && trackedRunId && (
-          <p className="mt-3 text-xs font-mono text-[var(--text-muted)]">Last tracked: {trackedRunId}</p>
+        {isDone && !isFailed && refreshResult && (
+          <p className="mt-3 text-xs font-mono text-[var(--accent-success)]">
+            Completed successfully{status?.runId ? `: ${status.runId}` : ''}
+          </p>
         )}
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <DarkButton onClick={() => void checkStatus()} disabled={isChecking}><RefreshCcw size={13} /> {isChecking ? 'Checking...' : 'Check status'}</DarkButton>
+          {isDone && !isFailed && refreshResult && status?.latestSuccessfulRunId && (
+            <DarkButton variant="primary" onClick={() => { window.location.reload(); }}>Load the report</DarkButton>
+          )}
         </div>
       </WorkspacePanel>
 
