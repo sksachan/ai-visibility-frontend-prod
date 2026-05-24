@@ -218,17 +218,27 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
         // New active run discovered - switch to tracking it
         setTrackedRunId(activeRunId);
       } else if (!brandMarketStatus.active && trackedRunId) {
-        // No active run from brand/market, but we have a tracked ID.
-        // Query the specific run to get its final status (completed/failed).
-        try {
-          const specificStatus = await fetchRefreshStatus(brand, market, trackedRunId);
-          finalStatus = specificStatus;
-        } catch {
-          // If specific run query fails, fall back to brand/market status
+        // No active run from brand/market. If we have a tracked ID from a previous
+        // submission in this session, query it for final status. But do NOT re-query
+        // stale IDs on initial page load — the brand/market status already told us
+        // there is no active run, so the dashboard should show idle.
+        // Only query specific run if the user started it in this session (has a result).
+        if (refreshResult) {
+          try {
+            const specificStatus = await fetchRefreshStatus(brand, market, trackedRunId);
+            finalStatus = specificStatus;
+          } catch {
+            // If specific run query fails, fall back to brand/market status
+          }
+        }
+        // Otherwise, clear the stale tracked ID so we don't keep polling an old run
+        // and showing its error state on every dashboard load.
+        else {
+          setTrackedRunId('');
         }
       }
 
-      const nextRunId = activeRunId || runIdFrom(finalStatus, trackedRunId) || valueFromRaw(finalStatus.raw, ['run_id', 'target_run_id', 'evidence_run_id']);
+      const nextRunId = activeRunId || (finalStatus.active ? runIdFrom(finalStatus, '') : '') || '';
       if (nextRunId) setTrackedRunId(nextRunId);
       setStatus(finalStatus);
     }

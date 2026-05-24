@@ -130,10 +130,19 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
   // For specific run queries, the response IS the run status directly (has stage/run_id at top level).
   // For brand/market queries, the active run is nested inside active_run.
   const isDirectRunStatus = Boolean(raw.stage || raw.current_stage) && raw.status !== 'ok';
+
+  // CRITICAL FIX: When the backend returns { status: 'ok', active_run: null } it means
+  // NO run is currently active. In this case we must NOT fall through to `raw` as the
+  // source because `raw` is the wrapper object (status: 'ok'), not a run object.
+  // Previously, falling through to `raw` caused the frontend to inspect stale fields
+  // from the `runs` array and incorrectly show error/running states from old runs.
+  // When active_run is null and this is NOT a direct run status query, the dashboard
+  // should show IDLE — no active run, no error, no running state.
+  const isIdleBrandMarketQuery = !isDirectRunStatus && activeRun === null;
   const source = isDirectRunStatus ? raw : (activeRun || raw);
 
-  const stage = String(source.stage || source.current_stage || '');
-  const status = String(source.status || '');
+  const stage = isIdleBrandMarketQuery ? '' : String(source.stage || source.current_stage || '');
+  const status = isIdleBrandMarketQuery ? 'ok' : String(source.status || '');
   const terminalStages = ['completed', 'success', 'successful', 'succeeded', 'report_bundle_ready', 'failed', 'error'];
   const isTerminal = terminalStages.includes(stage.toLowerCase()) || terminalStages.includes(status.toLowerCase());
 
@@ -141,12 +150,14 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
   // The backend may return status: "running" with auditor_error present — that is contradictory.
   // Error fields always take precedence over running status.
   const errorFields = ['auditor_error', 'portfolio_error', 'bodhi_error', 'error'];
-  const hasErrorField = errorFields.some(key => {
+  // When idle (no active run), do NOT inspect the wrapper object for error fields —
+  // those would come from stale runs in the `runs` array and cause false "Failed" display.
+  const hasErrorField = !isIdleBrandMarketQuery && errorFields.some(key => {
     const val = source[key];
     return val !== undefined && val !== null && val !== '' && val !== false;
   });
-  const hasFailed = source.failed === true || source.failed === 'true';
-  const hasFailedStage = stage.toLowerCase().endsWith('_failed');
+  const hasFailed = !isIdleBrandMarketQuery && (source.failed === true || source.failed === 'true');
+  const hasFailedStage = !isIdleBrandMarketQuery && stage.toLowerCase().endsWith('_failed');
   const isErrorState = hasErrorField || hasFailed || hasFailedStage;
 
   // Extract the specific error message for display
@@ -162,7 +173,8 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
 
   // active = true only when the backend returns an active_run that is NOT in a terminal state
   // AND there are no error fields present.
-  const active = !isErrorState && (
+  // When isIdleBrandMarketQuery is true, active is always false.
+  const active = !isIdleBrandMarketQuery && !isErrorState && (
     (activeRun !== null && !isTerminal) || (isDirectRunStatus && Boolean(stage) && !isTerminal)
   );
 
@@ -170,9 +182,9 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
     active,
     stage: effectiveStage || undefined,
     status: isErrorState ? 'failed' : status,
-    runId: String(source.run_id || source.runId || source.target_run_id || ''),
-    targetRunId: String(source.target_run_id || source.run_id || ''),
-    jobId: String(source.job_id || source.jobId || ''),
+    runId: isIdleBrandMarketQuery ? '' : String(source.run_id || source.runId || source.target_run_id || ''),
+    targetRunId: isIdleBrandMarketQuery ? '' : String(source.target_run_id || source.run_id || ''),
+    jobId: isIdleBrandMarketQuery ? '' : String(source.job_id || source.jobId || ''),
     latestSuccessfulRunId: String(raw.latest_successful_run_id || raw.latestSuccessfulRunId || ''),
     errorMessage,
     raw,
