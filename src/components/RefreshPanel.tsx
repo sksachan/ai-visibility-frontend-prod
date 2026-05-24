@@ -68,6 +68,11 @@ function statusText(status: RunStatusSummary | null, trackedRunId: string) {
   const id = runIdFrom(status, trackedRunId);
   if (!status && trackedRunId) return `Tracking: ${trackedRunId}`;
   if (!status) return 'Status not checked yet.';
+  // Error state takes precedence over everything
+  if (status.errorMessage || status.status === 'failed') {
+    const errMsg = status.errorMessage || niceStage(status.stage || 'failed');
+    return `Failed${id ? ` \u00b7 ${id}` : ''}: ${errMsg}`;
+  }
   // When backend is actively processing, show the current stage and run ID
   if (status.active) return `${niceStage(status.stage || status.status)}${id ? ` \u00b7 ${id}` : ''}`;
   // When idle (no active run), show waiting message with latest successful run info
@@ -180,8 +185,11 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
   const currentStage = normaliseStage(status?.stage || status?.status);
   const currentWfKey = wfKeyForStage(currentStage);
   const wfIdx = currentWfKey ? workflowStages.findIndex(s => s.key === currentWfKey) : -1;
-  const isFailed = failedStages.has(currentStage);
-  const isDone = currentStage === 'report_bundle_ready' || terminalStages.has(currentStage);
+  // Detect failure from error fields, not just stage name
+  const hasErrorMessage = Boolean(status?.errorMessage);
+  const isStatusFailed = status?.status === 'failed';
+  const isFailed = failedStages.has(currentStage) || currentStage.endsWith('_failed') || hasErrorMessage || isStatusFailed;
+  const isDone = !isFailed && (currentStage === 'report_bundle_ready' || terminalStages.has(currentStage));
 
   async function checkStatus() {
     setIsChecking(true); setError('');

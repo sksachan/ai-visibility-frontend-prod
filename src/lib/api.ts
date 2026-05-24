@@ -11,6 +11,7 @@ export interface RunStatusSummary {
   targetRunId?: string;
   jobId?: string;
   latestSuccessfulRunId?: string;
+  errorMessage?: string;
   raw?: Record<string, unknown>;
 }
 
@@ -136,19 +137,44 @@ export async function fetchRefreshStatus(brand: string, market: string, runId?: 
   const terminalStages = ['completed', 'success', 'successful', 'succeeded', 'report_bundle_ready', 'failed', 'error'];
   const isTerminal = terminalStages.includes(stage.toLowerCase()) || terminalStages.includes(status.toLowerCase());
 
-// active = true only when the backend returns an active_run that is NOT in a terminal state.
-// Previously this was `activeRun !== null` which incorrectly showed 'Running' when the
-// backend returned a completed run as active_run (now fixed server-side too).
-const active = (activeRun !== null && !isTerminal) || (isDirectRunStatus && Boolean(stage) && !isTerminal);
+  // Detect error fields that indicate a terminal failure regardless of status value.
+  // The backend may return status: "running" with auditor_error present — that is contradictory.
+  // Error fields always take precedence over running status.
+  const errorFields = ['auditor_error', 'portfolio_error', 'bodhi_error', 'error'];
+  const hasErrorField = errorFields.some(key => {
+    const val = source[key];
+    return val !== undefined && val !== null && val !== '' && val !== false;
+  });
+  const hasFailed = source.failed === true || source.failed === 'true';
+  const hasFailedStage = stage.toLowerCase().endsWith('_failed');
+  const isErrorState = hasErrorField || hasFailed || hasFailedStage;
+
+  // Extract the specific error message for display
+  const errorMessage = isErrorState
+    ? String(source.auditor_error || source.portfolio_error || source.bodhi_error || source.error || `Stage: ${stage}`)
+    : undefined;
+
+  // Override order: error > done > running
+  // If any error condition exists, the run is NOT active and should show as failed.
+  const effectiveStage = isErrorState
+    ? (hasFailedStage ? stage : (hasErrorField ? (stage || 'auditor_failed') : stage))
+    : stage;
+
+  // active = true only when the backend returns an active_run that is NOT in a terminal state
+  // AND there are no error fields present.
+  const active = !isErrorState && (
+    (activeRun !== null && !isTerminal) || (isDirectRunStatus && Boolean(stage) && !isTerminal)
+  );
 
   return {
     active,
-    stage: stage || undefined,
-    status,
+    stage: effectiveStage || undefined,
+    status: isErrorState ? 'failed' : status,
     runId: String(source.run_id || source.runId || source.target_run_id || ''),
     targetRunId: String(source.target_run_id || source.run_id || ''),
     jobId: String(source.job_id || source.jobId || ''),
     latestSuccessfulRunId: String(raw.latest_successful_run_id || raw.latestSuccessfulRunId || ''),
+    errorMessage,
     raw,
   };
 }

@@ -297,18 +297,32 @@ export default function App() {
             <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] p-3">
               <p className="typo-meta text-[var(--text-muted)] mb-2">Run Status</p>
               <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : refreshStatus?.stage && ['failed', 'error'].includes(String(refreshStatus.stage).toLowerCase()) ? 'bg-[var(--accent-danger)]' : 'bg-[var(--accent-success)]'}`} />
-                <span className={`text-sm font-semibold ${refreshStatus?.active ? 'text-[var(--accent-blue)]' : refreshStatus?.stage && ['failed', 'error'].includes(String(refreshStatus.stage).toLowerCase()) ? 'text-[var(--accent-danger)]' : 'text-[var(--accent-success)]'}`}>
-                  {refreshStatus?.active ? 'Running' : refreshStatus?.stage && ['failed', 'error'].includes(String(refreshStatus.stage).toLowerCase()) ? 'Failed' : 'Idle'}
+                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'bg-[var(--accent-danger)]' : refreshStatus?.active ? 'bg-[var(--accent-blue)] animate-pulse' : 'bg-[var(--accent-success)]'}`} />
+                <span className={`text-sm font-semibold ${refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'text-[var(--accent-danger)]' : refreshStatus?.active ? 'text-[var(--accent-blue)]' : 'text-[var(--accent-success)]'}`}>
+                  {refreshStatus?.errorMessage || refreshStatus?.status === 'failed' ? 'Failed' : refreshStatus?.active ? 'Running' : 'Idle'}
                 </span>
               </div>
-              {refreshStatus?.active && refreshStatus?.stage && (
+              {/* Error state: show error message */}
+              {(refreshStatus?.errorMessage || refreshStatus?.status === 'failed') && (
+                <>
+                  <p className="mt-2 text-[11px] text-[var(--accent-danger)]">{refreshStatus?.stage ? niceStage(refreshStatus.stage) : 'Auditor failed'}</p>
+                  {refreshStatus?.errorMessage && (
+                    <p className="mt-1 text-[10px] text-[var(--accent-danger)] break-all">{refreshStatus.errorMessage}</p>
+                  )}
+                  {refreshStatus?.runId && (
+                    <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">Run: {refreshStatus.runId}</p>
+                  )}
+                </>
+              )}
+              {/* Running state */}
+              {refreshStatus?.active && !refreshStatus?.errorMessage && refreshStatus?.status !== 'failed' && refreshStatus?.stage && (
                 <p className="mt-2 text-[11px] text-[var(--accent-blue)]">{niceStage(refreshStatus.stage)}</p>
               )}
-              {refreshStatus?.active && refreshStatus?.runId && (
+              {refreshStatus?.active && !refreshStatus?.errorMessage && refreshStatus?.status !== 'failed' && refreshStatus?.runId && (
                 <p className="mt-1 text-[10px] font-mono text-[var(--text-muted)] break-all">Run: {refreshStatus.runId}</p>
               )}
-              {!refreshStatus?.active && refreshStatus?.stage && !['report_bundle_ready', 'completed', 'success'].includes(String(refreshStatus.stage).toLowerCase()) && (
+              {/* Idle state: show last stage if not terminal */}
+              {!refreshStatus?.active && !refreshStatus?.errorMessage && refreshStatus?.status !== 'failed' && refreshStatus?.stage && !['report_bundle_ready', 'completed', 'success'].includes(String(refreshStatus.stage).toLowerCase()) && (
                 <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{niceStage(refreshStatus.stage)}</p>
               )}
               {refreshStatus?.latestSuccessfulRunId && (
