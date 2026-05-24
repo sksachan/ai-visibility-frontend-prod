@@ -149,9 +149,11 @@ export default function App() {
       {/* ── Left rail (fixed) ── */}
       <aside className="hidden lg:flex h-full w-56 shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-surface)] no-print overflow-y-auto hide-scrollbar">
         {/* Brand mark */}
-        <div className="px-4 pt-5 pb-4 border-b border-[var(--border-subtle)]">
-          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">AI Brand Visibility</p>
-          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">Intelligence</p>
+        <div className="flex items-center px-4 py-3 border-b border-[var(--border-subtle)]" style={{ minHeight: '49px' }}>
+          <div>
+            <p className="text-sm font-semibold text-[var(--text-primary)] leading-tight">AI Brand Visibility</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)] leading-tight">Intelligence</p>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -206,7 +208,7 @@ export default function App() {
         <div className="flex-1 min-w-0 overflow-y-auto">
           {/* Top bar */}
           <header className="sticky top-0 z-20 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 backdrop-blur no-print">
-            <div className="flex items-center justify-between gap-4 px-5 py-3">
+            <div className="flex items-center justify-between gap-4 px-5 py-3" style={{ minHeight: '49px' }}>
               <div className="flex items-center gap-3 min-w-0">
                 <div className="hidden lg:flex items-center gap-2 text-[13px] text-[var(--text-muted)]">
                   <span className="font-semibold text-[var(--accent-blue)]">Powered by</span>
@@ -343,7 +345,7 @@ export default function App() {
               <div className="space-y-1.5 text-xs text-[var(--text-secondary)]">
                 <div className="flex justify-between"><span>Brand</span><span className="font-medium text-[var(--text-primary)]">{report.brand}</span></div>
                 <div className="flex justify-between"><span>Market</span><span className="font-medium text-[var(--text-primary)]">{report.market}</span></div>
-                <div className="flex justify-between"><span>Queries</span><span className="font-medium text-[var(--text-primary)]">{report.queries.length}</span></div>
+                <div className="flex justify-between"><span>Queries</span><span className="font-medium text-[var(--text-primary)]">{report.queryWorkbench?.length || report.queries.length}</span></div>
                 <div className="flex justify-between"><span>Owned pages</span><span className="font-medium text-[var(--text-primary)]">{report.ownedPages.length}</span></div>
               </div>
             </div>

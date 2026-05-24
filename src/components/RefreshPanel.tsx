@@ -195,6 +195,10 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
   const isDone = !isFailed && (currentStage === 'report_bundle_ready' || terminalStages.has(currentStage));
   // Determine if the backend is actively processing (not just that we have a status object)
   const isActivelyRunning = Boolean(status?.active) && !isFailed && !isDone;
+  // After page refresh: if backend is idle but has a latestSuccessfulRunId,
+  // show the completed state instead of resetting to 'Ready to Start'.
+  // This ensures the progress bar reflects the last successful run's completion.
+  const hasCompletedLastRun = !isActivelyRunning && !isFailed && !isDone && !refreshResult && Boolean(status?.latestSuccessfulRunId) && !status?.active;
 
   async function checkStatus() {
     setIsChecking(true); setError('');
@@ -272,12 +276,12 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
           {workflowStages.map((stage, index) => {
             // State logic:
             // 1. Failed: the stage that failed shows red
-            // 2. Done (all complete): all stages green
+            // 2. Done (all complete or isDone): all stages green
             // 3. Actively running: stages before current = done, current = active, after = pending
-            // 4. Idle (no active run, no status): all pending
+            // 4. hasCompletedLastRun (page refreshed after success): all stages green
+            // 5. Idle (no active run, no status): all pending
             let state: 'pending' | 'active' | 'done' | 'failed';
             if (isFailed) {
-              // Show stages before failed stage as done, failed stage as failed, rest as pending
               if (currentWfKey === stage.key) {
                 state = 'failed';
               } else if (wfIdx >= 0 && index < wfIdx) {
@@ -285,10 +289,10 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
               } else {
                 state = 'pending';
               }
-            } else if (isDone) {
+            } else if (isDone || hasCompletedLastRun) {
+              // All stages green when run completed (including after page refresh)
               state = 'done';
             } else if (isActivelyRunning && wfIdx >= 0) {
-              // Backend is actively processing - show progress
               if (index < wfIdx) {
                 state = 'done';
               } else if (currentWfKey === stage.key) {
@@ -297,7 +301,6 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
                 state = 'pending';
               }
             } else {
-              // Idle or status not yet loaded
               state = 'pending';
             }
             return <WorkflowStage key={stage.key} label={stage.label} state={state} />;
@@ -313,14 +316,14 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
             Failed: {status?.runId || trackedRunId}{status?.errorMessage ? ` — ${status.errorMessage}` : ''}
           </p>
         )}
-        {isDone && !isFailed && refreshResult && (
+        {(isDone || hasCompletedLastRun) && !isFailed && (
           <p className="mt-3 text-xs font-mono text-[var(--accent-success)]">
-            Completed successfully{status?.runId ? `: ${status.runId}` : ''}
+            Completed successfully{status?.latestSuccessfulRunId ? `: ${status.latestSuccessfulRunId}` : status?.runId ? `: ${status.runId}` : ''}
           </p>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <DarkButton onClick={() => void checkStatus()} disabled={isChecking}><RefreshCcw size={13} /> {isChecking ? 'Checking...' : 'Check status'}</DarkButton>
-          {isDone && !isFailed && refreshResult && status?.latestSuccessfulRunId && (
+          {(isDone || hasCompletedLastRun) && !isFailed && status?.latestSuccessfulRunId && (
             <DarkButton variant="primary" onClick={() => { window.location.reload(); }}>Load the report</DarkButton>
           )}
         </div>

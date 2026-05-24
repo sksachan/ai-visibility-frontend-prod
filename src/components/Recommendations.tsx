@@ -1,7 +1,52 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import type { ActionItem, RecommendationModule, ReportBundle, CmsCopyModule, AdvancedGeoAsset, AdvancedPrAssetPack } from '../types/report';
 import { Badge, WorkspacePanel, SectionHeader, DarkButton, StatusPill } from './ui';
-import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
+import { ChevronRight, ChevronDown, Copy, Check, Download } from 'lucide-react';
+
+/* ── CSV/Excel Export Utility ──────────────────────────────────────── */
+function escapeCsvCell(value: unknown): string {
+  const str = String(value ?? '').replace(/"/g, '""');
+  return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str;
+}
+
+function downloadCsv(filename: string, headers: string[], rows: string[][]) {
+  const csv = [headers.map(escapeCsvCell).join(','), ...rows.map(r => r.map(escapeCsvCell).join(','))].join('\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCmsModules(items: RecommendationModule[]) {
+  const headers = ['Title', 'Target URL', 'Priority', 'Owner', 'Journey', 'Module Type', 'Value Score', 'Linked Queries', 'Direct Answer', 'Recommendation'];
+  const rows = items.map(item => [
+    item.title, item.targetUrl, item.priority, item.owner, item.journeyCategory || '',
+    item.moduleType || '', String(item.valueScore ?? ''), String(item.queryCoverageCount ?? ''),
+    item.directAnswer || '', item.recommendation
+  ]);
+  downloadCsv('content_alignment_export.csv', headers, rows);
+}
+
+function exportPrModules(items: RecommendationModule[]) {
+  const headers = ['Title', 'Priority', 'Owner', 'Source Type', 'Value Score', 'Linked Queries', 'Recommendation', 'Journey'];
+  const rows = items.map(item => [
+    item.title, item.priority, item.owner, item.sourceType || '',
+    String(item.valueScore ?? ''), String(item.queryCoverageCount ?? ''),
+    item.recommendation, item.journeyCategory || ''
+  ]);
+  downloadCsv('pr_brand_suggestions_export.csv', headers, rows);
+}
+
+function exportActionChecklist(items: ActionItem[]) {
+  const headers = ['Action', 'Priority', 'Owner', 'Target', 'Effort', 'Status', 'Workstream', 'Linked Queries'];
+  const rows = items.map(item => [
+    item.action, item.priority, item.owner, item.target || '', item.effort,
+    item.status, item.workstream || item.source || '',
+    String(item.queryCoverageCount || item.linkedQueryIds?.length || 0)
+  ]);
+  downloadCsv('action_checklist_export.csv', headers, rows);
+}
 
 // Backward-compatible aliases
 const Card = WorkspacePanel;
@@ -18,11 +63,16 @@ export function Recommendations({ report }: { report: ReportBundle }) {
 export function CmsRecommendations({ report, highlightUrl }: { report: ReportBundle; highlightUrl?: string }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">
-        <p className="font-semibold">⚠️ Disclaimer</p>
-        <p className="mt-1">Please review each recommendation with your Brand, Content, and Legal teams before making any changes to live pages.</p>
+      <div className="flex items-center justify-between">
+        <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300 flex-1">
+          <p className="font-semibold">⚠️ Disclaimer</p>
+          <p className="mt-1">Please review each recommendation with your Brand, Content, and Legal teams before making any changes to live pages.</p>
+        </div>
+        <DarkButton onClick={() => exportCmsModules(report.cmsModules)} disabled={!report.cmsModules.length}>
+          <Download size={13} /> Export CSV
+        </DarkButton>
       </div>
-      <RecommendationPanel title={`Content Insights — Page-level recommendations (${report.cmsModules.length})`} eyebrow="Content remediation" items={report.cmsModules} type="cms" highlightUrl={highlightUrl} />
+      <RecommendationPanel title={`Content Insights \u2014 Page-level recommendations (${report.cmsModules.length})`} eyebrow="Content remediation" items={report.cmsModules} type="cms" highlightUrl={highlightUrl} />
     </div>
   );
 }
@@ -30,11 +80,16 @@ export function CmsRecommendations({ report, highlightUrl }: { report: ReportBun
 export function PrRecommendations({ report }: { report: ReportBundle }) {
   return (
     <div className="space-y-4">
-      <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">
-        <p className="font-semibold">⚠️ Disclaimer</p>
-        <p className="mt-1">Please review each PR recommendation with your Brand, Content, and Legal teams before executing any external outreach or asset creation.</p>
+      <div className="flex items-center justify-between">
+        <div className="rounded-[var(--radius-sm)] border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300 flex-1">
+          <p className="font-semibold">⚠️ Disclaimer</p>
+          <p className="mt-1">Please review each PR recommendation with your Brand, Content, and Legal teams before executing any external outreach or asset creation.</p>
+        </div>
+        <DarkButton onClick={() => exportPrModules(report.prOpportunities)} disabled={!report.prOpportunities.length}>
+          <Download size={13} /> Export CSV
+        </DarkButton>
       </div>
-      <RecommendationPanel title={`PR & Brand Insights — Grouped opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" />
+      <RecommendationPanel title={`PR & Brand Insights \u2014 Grouped opportunities (${report.prOpportunities.length})`} eyebrow="External evidence" items={report.prOpportunities} type="pr" />
     </div>
   );
 }
@@ -648,6 +703,8 @@ export function ActionChecklist({ report }: { report: ReportBundle }) {
   const [workstream, setWorkstream] = useState('All');
   const [priority, setPriority] = useState('All');
   const [sortBy, setSortBy] = useState('priority');
+  const [tablePage, setTablePage] = useState(0);
+  const TABLE_PAGE_SIZE = 5;
   const workstreams = useMemo(() => unique(report.actionChecklist.map((item) => item.workstream || item.source || '')), [report.actionChecklist]);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -666,26 +723,76 @@ export function ActionChecklist({ report }: { report: ReportBundle }) {
     });
   }, [report.actionChecklist, search, workstream, priority, sortBy]);
 
+  const totalPages = Math.ceil(filtered.length / TABLE_PAGE_SIZE);
+  const pagedRows = filtered.slice(tablePage * TABLE_PAGE_SIZE, (tablePage + 1) * TABLE_PAGE_SIZE);
+
   return (
     <Card>
-      <SectionTitle eyebrow="Action checklist" title={`Explicit Bodhi action checklist (${filtered.length}/${report.actionChecklist.length})`}>
-        CMS actions are tracked at owned-page level. PR actions are tracked separately by grouped query/source opportunity and are not tied to owned URLs.
-      </SectionTitle>
+      <div className="flex items-center justify-between mb-2">
+        <SectionTitle eyebrow="Action checklist" title={`Explicit Bodhi action checklist (${filtered.length}/${report.actionChecklist.length})`}>
+          CMS actions are tracked at owned-page level. PR actions are tracked separately by grouped query/source opportunity and are not tied to owned URLs.
+        </SectionTitle>
+        <DarkButton onClick={() => exportActionChecklist(report.actionChecklist)} disabled={!report.actionChecklist.length}>
+          <Download size={13} /> Export CSV
+        </DarkButton>
+      </div>
       <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <input className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" placeholder="Search action, target, category..." value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={workstream} onChange={(event) => setWorkstream(event.target.value)}>
+        <input className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" placeholder="Search action, target, category..." value={search} onChange={(event) => { setSearch(event.target.value); setTablePage(0); }} />
+        <select className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" value={workstream} onChange={(event) => { setWorkstream(event.target.value); setTablePage(0); }}>
           <option>All</option>{workstreams.map((item) => <option key={item}>{item}</option>)}
         </select>
-        <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={priority} onChange={(event) => setPriority(event.target.value)}>
+        <select className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" value={priority} onChange={(event) => { setPriority(event.target.value); setTablePage(0); }}>
           <option>All</option><option>High</option><option>Medium</option><option>Low</option>
         </select>
-        <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+        <select className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]" value={sortBy} onChange={(event) => { setSortBy(event.target.value); setTablePage(0); }}>
           <option value="priority">Sort: priority</option><option value="coverage">Sort: query coverage</option><option value="target">Sort: target</option><option value="category">Sort: category</option>
         </select>
       </div>
-      <div className="grid gap-3">
-        {filtered.map((item, index) => <ActionRow key={`${item.source}-${item.target}-${item.action}-${index}`} item={item} />)}
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="text-left">
+              <th className="typo-meta px-3 py-3 text-[var(--text-muted)]">Priority</th>
+              <th className="typo-meta px-3 py-3 text-[var(--text-muted)]">Action</th>
+              <th className="typo-meta px-3 py-3 text-[var(--text-muted)]">Owner</th>
+              <th className="typo-meta px-3 py-3 text-[var(--text-muted)]">Target</th>
+              <th className="typo-meta px-3 py-3 text-[var(--text-muted)]">Effort</th>
+              <th className="typo-meta px-3 py-3 text-[var(--text-muted)]">Queries</th>
+              <th className="typo-meta px-3 py-3 text-[var(--text-muted)]">Workstream</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pagedRows.map((item, index) => {
+              const target = item.target || item.source || '';
+              const isUrl = /^https?:\/\//i.test(target);
+              return (
+                <tr key={`${item.source}-${item.target}-${item.action}-${index}`} className="align-top">
+                  <td className="px-3 py-3"><Badge tone={tone(item.priority)}>{item.priority}</Badge></td>
+                  <td className="px-3 py-3 max-w-md"><p className="text-[var(--text-primary)] font-medium">{item.action}</p></td>
+                  <td className="px-3 py-3 text-[var(--text-secondary)]">{item.owner}</td>
+                  <td className="px-3 py-3 max-w-xs"><p className={`text-[var(--text-secondary)] ${isUrl ? 'break-all font-mono text-xs' : ''}`}>{target || '\u2014'}</p></td>
+                  <td className="px-3 py-3 text-[var(--text-secondary)]">{item.effort}</td>
+                  <td className="px-3 py-3 text-[var(--text-secondary)]">{item.queryCoverageCount || item.linkedQueryIds?.length || 0}</td>
+                  <td className="px-3 py-3 text-[var(--text-muted)]">{item.workstream || item.source || '\u2014'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-end gap-3">
+          <p className="text-xs text-[var(--text-muted)]">
+            {tablePage * TABLE_PAGE_SIZE + 1}\u2013{Math.min((tablePage + 1) * TABLE_PAGE_SIZE, filtered.length)} of {filtered.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <DarkButton onClick={() => setTablePage((p) => Math.max(0, p - 1))} disabled={tablePage === 0}>Prev</DarkButton>
+            <span className="text-xs text-[var(--text-secondary)]">{tablePage + 1} / {totalPages}</span>
+            <DarkButton onClick={() => setTablePage((p) => Math.min(totalPages - 1, p + 1))} disabled={tablePage >= totalPages - 1}>Next</DarkButton>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
