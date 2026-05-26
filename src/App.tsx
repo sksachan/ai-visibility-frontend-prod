@@ -95,15 +95,18 @@ export default function App() {
   const market = import.meta.env.VITE_DEFAULT_MARKET || report.market;
 
   useEffect(() => {
-    void loadLatest(true);
-    void pollRefreshStatus();
+    if (brand && market) {
+      void loadLatest(true);
+      void pollRefreshStatus();
+    }
     // Poll every 10s to keep status responsive; backend call is lightweight
-    const timer = window.setInterval(() => void pollRefreshStatus(), 10000);
+    const timer = window.setInterval(() => { if (brand && market) void pollRefreshStatus(); }, 10000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function pollRefreshStatus() {
+    if (!brand || !market) return;
     try {
       const next = await fetchRefreshStatus(brand, market);
       setRefreshStatus(next);
@@ -111,6 +114,7 @@ export default function App() {
   }
 
   async function loadLatest(isInitialLoad = false) {
+    if (!brand || !market) return;
     setLoading(true);
     setNotice(null);
     try {
