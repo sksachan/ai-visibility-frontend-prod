@@ -45,7 +45,6 @@ export function BrandTopicScorecard({ rows }: { rows: BrandTopicScorecardRow[] }
                 <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Brand topic</th>
                 <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">AI visibility score</th>
                 <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Relative position vs. key competitor</th>
-                <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Avg brand sentiment</th>
                 <th className="px-4 py-3 typo-meta text-[var(--text-muted)]">Comment</th>
               </tr>
             </thead>
@@ -63,13 +62,6 @@ export function BrandTopicScorecard({ rows }: { rows: BrandTopicScorecardRow[] }
                     <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${scoreTone(row.aiVisibilityScore)}`}>{scoreLabel(row.aiVisibilityScore)}</span>
                   </td>
                   <td className="max-w-sm px-4 py-4 text-sm leading-6 text-[var(--text-secondary)]">{row.relativePosition}</td>
-                  <td className="px-4 py-4">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${sentimentTone(row.avgBrandSentiment)}`}>
-                      {row.avgBrandSentiment && row.avgBrandSentiment !== 'not_applicable'
-                        ? `${row.avgBrandSentiment}${row.avgBrandSentimentScore != null ? ` (${row.avgBrandSentimentScore > 0 ? '+' : ''}${row.avgBrandSentimentScore})` : ''}`
-                        : 'N/A'}
-                    </span>
-                  </td>
                   <td className="max-w-md px-4 py-4 text-sm leading-6 text-[var(--text-secondary)]">{row.comment}</td>
                 </tr>
               ))}

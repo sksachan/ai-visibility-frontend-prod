@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import type { CitationExample, ReportBundle } from '../types/report';
 import { WorkspacePanel, SectionHeader, DarkButton } from './ui';
 
-const label = (value: string) => value.replaceAll('_', ' ');
+const label = (value: unknown) => String(value || 'unknown').replaceAll('_', ' ');
 const palette = ['#54a2ff', '#935dff', '#00c758', '#ffea35', '#ff6568', '#9f9f9f', '#54a2ff', '#935dff'];
 
 type XAxisMode = 'sourceType' | 'domain';

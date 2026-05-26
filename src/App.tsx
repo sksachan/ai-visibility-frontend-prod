@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Component, useEffect, useMemo, useRef, useState } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import { Activity, BookOpen, BarChart3, Download, FileText, History, Layers, LayoutDashboard, Menu, RefreshCcw, Search, Settings, Upload, X, Zap } from 'lucide-react';
 import { ExecutiveReport } from './components/ExecutiveReport';
 import { VisibilityMatrix } from './components/VisibilityMatrix';
@@ -16,6 +17,27 @@ import { normaliseReport } from './lib/normaliseReport';
 import type { ReportBundle } from './types/report';
 import { mockReport } from './data/mockReport';
 import bodhiLogo from './bodhi-mark.svg';
+
+/* ── Error Boundary ─────────────────────────────────────────────── */
+interface EBProps { children: ReactNode; fallback?: ReactNode; label?: string }
+interface EBState { hasError: boolean; error: Error | null }
+class ErrorBoundary extends Component<EBProps, EBState> {
+  constructor(props: EBProps) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error(`[ErrorBoundary${this.props.label ? ` ${this.props.label}` : ''}]`, error, info); }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback ?? (
+        <div className="rounded-[var(--radius-md)] border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
+          <p className="font-semibold">Section failed to render{this.props.label ? `: ${this.props.label}` : ''}</p>
+          <p className="mt-1 text-xs text-red-400/70">{this.state.error?.message || 'Unknown error'}</p>
+          <button onClick={() => this.setState({ hasError: false, error: null })} className="mt-2 rounded border border-red-500/30 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/20">Retry</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 type Tab = 'executive' | 'workbench' | 'matrix' | 'owned' | 'cms' | 'pr' | 'actions' | 'runs' | 'appendix' | 'refresh';
 type Notice = { tone: 'success' | 'warning' | 'error'; message: string } | null;
@@ -275,16 +297,16 @@ export default function App() {
 
           {/* Main report area with audit-canvas background */}
           <main id="report-root" className="audit-canvas space-y-5 px-5 py-5">
-            {activeTab === 'executive' && <ExecutiveReport report={report} />}
-            {activeTab === 'workbench' && <QueryWorkbench report={report} />}
-            {activeTab === 'matrix' && <><VisibilityMatrix report={report} /><Trend report={report} /></>}
-            {activeTab === 'owned' && <OwnedUrlReadiness report={report} onOpenCms={openCmsForUrl} />}
-            {activeTab === 'cms' && <CmsRecommendations report={report} highlightUrl={highlightCmsUrl} />}
-            {activeTab === 'pr' && <PrRecommendations report={report} />}
-            {activeTab === 'actions' && <ActionChecklist report={report} />}
-            {activeTab === 'runs' && <RunHistory brand={brand} market={market} onLoad={(next, row) => { setReport(next); setActiveTab('executive'); setFooterMessage(parseMessage(next, `Loaded previous run ${row.run_id}`)); setNotice(null); }} />}
-            {activeTab === 'appendix' && <MethodologyAppendix />}
-            {activeTab === 'refresh' && <RefreshPanel brand={report.brand} market={report.market} />}
+            {activeTab === 'executive' && <ErrorBoundary label="Executive Report"><ExecutiveReport report={report} /></ErrorBoundary>}
+            {activeTab === 'workbench' && <ErrorBoundary label="Query Workbench"><QueryWorkbench report={report} /></ErrorBoundary>}
+            {activeTab === 'matrix' && <ErrorBoundary label="Source Landscape"><VisibilityMatrix report={report} /><Trend report={report} /></ErrorBoundary>}
+            {activeTab === 'owned' && <ErrorBoundary label="Owned URL Readiness"><OwnedUrlReadiness report={report} onOpenCms={openCmsForUrl} /></ErrorBoundary>}
+            {activeTab === 'cms' && <ErrorBoundary label="Content Alignment"><CmsRecommendations report={report} highlightUrl={highlightCmsUrl} /></ErrorBoundary>}
+            {activeTab === 'pr' && <ErrorBoundary label="PR & Brand Suggestions"><PrRecommendations report={report} /></ErrorBoundary>}
+            {activeTab === 'actions' && <ErrorBoundary label="Action Checklist"><ActionChecklist report={report} /></ErrorBoundary>}
+            {activeTab === 'runs' && <ErrorBoundary label="Run History"><RunHistory brand={brand} market={market} onLoad={(next, row) => { setReport(next); setActiveTab('executive'); setFooterMessage(parseMessage(next, `Loaded previous run ${row.run_id}`)); setNotice(null); }} /></ErrorBoundary>}
+            {activeTab === 'appendix' && <ErrorBoundary label="Documentation"><MethodologyAppendix /></ErrorBoundary>}
+            {activeTab === 'refresh' && <ErrorBoundary label="Refresh Panel"><RefreshPanel brand={report.brand} market={report.market} /></ErrorBoundary>}
           </main>
 
           {/* Footer */}
@@ -364,10 +386,12 @@ export default function App() {
         </aside>
       </div>
 
-      {/* PDF off-screen render target — uses dedicated PdfReport with A4-safe light layout */}
-      <div id="pdf-report-root" className="fixed -left-[10000px] top-0 w-[794px]" aria-hidden="true">
-        <PdfReport report={report} />
-      </div>
+      {/* PDF off-screen render target — wrapped in error boundary so PDF issues cannot blank the dashboard */}
+      <ErrorBoundary label="PDF Report" fallback={<div id="pdf-report-root" />}>
+        <div id="pdf-report-root" className="fixed -left-[10000px] top-0 w-[794px]" aria-hidden="true">
+          <PdfReport report={report} />
+        </div>
+      </ErrorBoundary>
     </div>
   );
 }

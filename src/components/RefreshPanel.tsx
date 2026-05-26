@@ -260,7 +260,20 @@ export function RefreshPanel({ brand: defaultBrand, market: defaultMarket }: { b
     catch (err) { setError(err instanceof Error ? err.message : String(err)); } finally { setIsChecking(false); }
   }
 
-  useEffect(() => { const initial = window.setTimeout(() => void checkStatus(), 0); const timer = window.setInterval(() => void checkStatus(), 10000); return () => { window.clearTimeout(initial); window.clearInterval(timer); }; }, [brand, market, trackedRunId]);
+  // Use a ref to track the run ID for polling so changes don't restart the timer.
+  // This prevents the infinite re-render loop where checkStatus() -> setTrackedRunId('') -> useEffect re-fires -> checkStatus() again.
+  const trackedRunIdRef = useRef(trackedRunId);
+  trackedRunIdRef.current = trackedRunId;
+
+  useEffect(() => {
+    const doCheck = () => void checkStatus();
+    const initial = window.setTimeout(doCheck, 0);
+    const timer = window.setInterval(doCheck, 10000);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
+    // Only restart polling when brand/market changes, NOT when trackedRunId changes.
+    // trackedRunId is read via ref inside checkStatus to avoid the infinite loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brand, market]);
 
   async function onSubmit() {
     setIsSubmitting(true); setError(''); setRefreshResult(null);
