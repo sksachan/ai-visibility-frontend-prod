@@ -2,6 +2,7 @@ import { Component, useEffect, useMemo, useRef, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { Activity, BookOpen, BarChart3, Download, FileText, History, Layers, LayoutDashboard, Menu, RefreshCcw, Search, Settings, Upload, X, Zap } from 'lucide-react';
 import { ExecutiveReport } from './components/ExecutiveReport';
+import { CompetitorVisibilityMatrix } from './components/CompetitorVisibilityMatrix';
 import { VisibilityMatrix } from './components/VisibilityMatrix';
 import { Trend } from './components/Trend';
 import { OwnedUrlReadiness } from './components/Diagnostics';
@@ -39,7 +40,7 @@ class ErrorBoundary extends Component<EBProps, EBState> {
   }
 }
 
-type Tab = 'executive' | 'workbench' | 'matrix' | 'owned' | 'cms' | 'pr' | 'actions' | 'runs' | 'appendix' | 'refresh';
+type Tab = 'executive' | 'competitors' | 'workbench' | 'matrix' | 'owned' | 'cms' | 'pr' | 'actions' | 'runs' | 'appendix' | 'refresh';
 type Notice = { tone: 'success' | 'warning' | 'error'; message: string } | null;
 
 type NavItem = { id: Tab; label: string; icon: typeof LayoutDashboard };
@@ -50,6 +51,7 @@ const navGroups: NavGroup[] = [
     { id: 'executive', label: 'Executive Report', icon: LayoutDashboard },
   ]},
   { label: 'AEO Insights', items: [
+    { id: 'competitors', label: 'Competitor Visibility', icon: BarChart3 },
     { id: 'workbench', label: 'Query Workbench', icon: Search },
     { id: 'matrix', label: 'Source Landscape', icon: Layers },
   ]},
@@ -298,6 +300,7 @@ export default function App() {
           {/* Main report area with audit-canvas background */}
           <main id="report-root" className="audit-canvas space-y-5 px-5 py-5">
             {activeTab === 'executive' && <ErrorBoundary label="Executive Report"><ExecutiveReport report={report} /></ErrorBoundary>}
+            {activeTab === 'competitors' && <ErrorBoundary label="Competitor Visibility"><CompetitorVisibilityMatrix report={report} /></ErrorBoundary>}
             {activeTab === 'workbench' && <ErrorBoundary label="Query Workbench"><QueryWorkbench report={report} /></ErrorBoundary>}
             {activeTab === 'matrix' && <ErrorBoundary label="Source Landscape"><VisibilityMatrix report={report} /><Trend report={report} /></ErrorBoundary>}
             {activeTab === 'owned' && <ErrorBoundary label="Owned URL Readiness"><OwnedUrlReadiness report={report} onOpenCms={openCmsForUrl} /></ErrorBoundary>}

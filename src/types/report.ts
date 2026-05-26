@@ -302,6 +302,68 @@ export interface QueryWorkbenchItem {
   loop_state?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Competitor Visibility Matrix types
+// ---------------------------------------------------------------------------
+
+export interface CompetitorDomainStat {
+  domain: string;
+  citation_count: number;
+  weighted_citation_score: number;
+  source_type: string;
+}
+
+export interface CompetitorQueryStat {
+  query_id: string;
+  query: string;
+  topic: string;
+  citation_count: number;
+  best_citation_rank: number | null;
+  source_types: string[];
+}
+
+export interface CompetitorScoreComponents {
+  query_presence: number;
+  citation_presence: number;
+  citation_rank: number;
+  topic_breadth: number;
+  source_diversity: number;
+  framing_signal: number;
+}
+
+export interface CompetitorEntry {
+  competitor: string;
+  ai_visibility_score: number;
+  queries_present: number;
+  query_presence_pct: number;
+  citation_count: number;
+  citation_share_pct: number;
+  weighted_citation_score: number;
+  avg_citation_rank: number;
+  source_type_influence_pct: Record<string, number>;
+  topic_presence: Record<string, number>;
+  top_domains: CompetitorDomainStat[];
+  top_queries: CompetitorQueryStat[];
+  score_components: CompetitorScoreComponents;
+  interpretation: string;
+}
+
+export interface CompetitorVisibilityMatrix {
+  schema_version: string;
+  brand: string;
+  market: string;
+  basis: string;
+  query_count_total: number;
+  query_count_non_branded: number;
+  competitors: CompetitorEntry[];
+  methodology: {
+    score_type: string;
+    score_scale: string;
+    scoring_components: Record<string, number>;
+    citation_rank_weights: Record<string, number>;
+  };
+}
+
 export interface ParserMeta {
   source: 'bodhi-output' | 'canonical-report' | 'api-report' | 'sample';
   parsedAt: string;
@@ -341,6 +403,7 @@ export interface ReportBundle {
   prOpportunities: RecommendationModule[];
   actionChecklist: ActionItem[];
   queryWorkbench?: QueryWorkbenchItem[];
+  competitorVisibilityMatrix?: CompetitorVisibilityMatrix;
   parserMeta?: ParserMeta;
   aiHygiene?: AiHygiene;
   methodology?: Record<string, unknown>;

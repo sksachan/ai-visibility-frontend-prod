@@ -2,7 +2,7 @@ import type {
   ReportBundle, ExecutiveSection, HeadlineMetrics, BrandTopicScorecardRow,
   CompetitorVisibility, SourceTypeCount, TrendPoint, QueryDiagnostic,
   OwnedPage, RecommendationModule, ActionItem, CitationExample,
-  QueryWorkbenchItem, AiHygiene,
+  QueryWorkbenchItem, AiHygiene, CompetitorVisibilityMatrix,
 } from '../types/report';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -326,11 +326,15 @@ export function normaliseReport(raw: any): ReportBundle {
     structured_data: rawHygiene.structured_data || rawHygiene.structuredData,
   } : undefined;
 
+  // Competitor Visibility Matrix (pass-through — already structured by backend)
+  const rawCvm = r.competitor_visibility_matrix || r.competitorVisibilityMatrix;
+  const competitorVisibilityMatrix: CompetitorVisibilityMatrix | undefined = rawCvm && typeof rawCvm === 'object' ? rawCvm as CompetitorVisibilityMatrix : undefined;
+
   return {
     runId, brand, market, generatedAt, evidenceDate,
     executive, visibility, sourceLandscape, trend,
     queries, ownedPages, cmsModules, prOpportunities, actionChecklist,
-    queryWorkbench, aiHygiene,
+    queryWorkbench, competitorVisibilityMatrix, aiHygiene,
   };
 }
 
